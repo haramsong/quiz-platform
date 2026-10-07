@@ -9,10 +9,16 @@ import AnswerReveal from '../AnswerReveal';
 
 const Phase = { LOGIN: 'login', SETUP: 'setup', LOBBY: 'lobby', QUESTION: 'question', LB: 'lb', RESULT: 'result', PAST_RESULT: 'past_result' };
 
+// Per-code host PIN cache (session-scoped; cleared when the tab closes).
+const pinKey = (code) => `qp_host_pin_${code}`;
+const loadPin = (code) => (code ? sessionStorage.getItem(pinKey(code)) || '' : '');
+const savePin = (code, pin) => { try { sessionStorage.setItem(pinKey(code), pin); } catch { /* no-op */ } };
+const clearPin = (code) => { try { sessionStorage.removeItem(pinKey(code)); } catch { /* no-op */ } };
+
 export default function HostApp({ initialCode }) {
   const [phase, setPhase] = useState(Phase.LOGIN);
   const [code, setCode] = useState(initialCode || '');
-  const [pin, setPin] = useState('');
+  const [pin, setPin] = useState(() => loadPin(initialCode || ''));
   const [err, setErr] = useState('');
   const [loading, setLoading] = useState(false);
 
@@ -81,19 +87,18 @@ export default function HostApp({ initialCode }) {
     } catch { /* ignore */ }
   }, [code, pin]);
 
-  const doLogin = async (e) => {
-    e.preventDefault();
-    setLoading(true); setErr('');
+  const authenticate = useCallback(async (rawCode, rawPin, { silent = false } = {}) => {
+    const enteredCode = (rawCode || '').trim().toUpperCase();
+    const enteredPin = (rawPin || '').trim();
+    if (!enteredCode || !enteredPin) return false;
+    if (!silent) { setLoading(true); setErr(''); }
     try {
-      const enteredCode = code.trim().toUpperCase();
-      const enteredPin = pin.trim();
-      // getQuiz succeeds only when code + PIN are valid (403 otherwise)
-      const q = await api.getQuiz(enteredCode, enteredPin);
+      const q = await api.getQuiz(enteredCode, enteredPin); // 403 if invalid
       setCode(enteredCode);
       setPin(enteredPin);
       setQuizData(q);
       setPhase(Phase.SETUP);
-      // sync the URL ?code= to the authenticated code (fix mismatched/stale URL)
+      savePin(enteredCode, enteredPin); // remember for this tab
       try {
         const url = new URL(window.location.href);
         if (url.searchParams.get('code') !== enteredCode) {
@@ -101,10 +106,28 @@ export default function HostApp({ initialCode }) {
           window.history.replaceState({}, '', url);
         }
       } catch { /* no-op */ }
+      return true;
     } catch (ex) {
-      setErr(ex.message || '접속 실패');
-    } finally { setLoading(false); }
+      if (!silent) setErr(ex.message || '접속 실패');
+      if (ex.status === 403) clearPin(enteredCode); // stale PIN — forget it
+      return false;
+    } finally {
+      if (!silent) setLoading(false);
+    }
+  }, []);
+
+  const doLogin = async (e) => {
+    e.preventDefault();
+    await authenticate(code, pin);
   };
+
+  // Auto-login: if URL has ?code= and we have a stored PIN, try silently.
+  useEffect(() => {
+    const c = (initialCode || '').trim().toUpperCase();
+    const p = loadPin(c);
+    if (c && p) authenticate(c, p, { silent: true });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const refreshSession = useCallback(async () => {
     try {
