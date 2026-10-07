@@ -1,7 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { api } from '../api';
 import { connect, send, disconnect } from '../ws';
-import { colorHex } from '../constants';
 import SetupPage from './SetupPage';
 import { JoinToastContainer, createToast } from './JoinToast';
 import PlayQR from './PlayQR';
@@ -176,6 +175,17 @@ export default function HostApp({ initialCode }) {
     setBusy(false);
   };
 
+  // Stop the current game and return to the lobby (resets so a clean restart works).
+  const backToLobby = async () => {
+    if (!window.confirm('진행을 중단하고 로비로 돌아갈까요?\n현재 게임이 초기화됩니다.')) return;
+    clearInterval(timerRef.current);
+    try { await api.resetGame(code, pin); } catch { /* ignore */ }
+    setPcount(0);
+    setSessionInfo({ state: 'WAITING', playerCount: 0, hasResult: false });
+    setQuestion(null); setLb(null); setResult(null);
+    setPhase(Phase.LOBBY);
+  };
+
   const viewPastResult = async () => {
     try {
       const r = await api.getResult(code, pin);
@@ -251,6 +261,7 @@ export default function HostApp({ initialCode }) {
     const q = question;
     return (
       <div className="host-present">
+        <button className="btn ghost tiny corner-lobby" onClick={backToLobby}>← 로비</button>
         <div className="top-bar">
           <span className="q-num">Q{q.order}/{q.total}</span>
           <span className="points-badge big">{q.points || 1}점</span>
@@ -265,7 +276,7 @@ export default function HostApp({ initialCode }) {
         )}
         <div className="host-choices">
           {(q.choices || []).map((c) => (
-            <div key={c.id} className="host-choice" style={{ background: colorHex(c.color) }}>
+            <div key={c.id} className="host-choice plain">
               <span className="text">{c.text}</span>
             </div>
           ))}
@@ -277,6 +288,7 @@ export default function HostApp({ initialCode }) {
 
   if (phase === Phase.LB && lb) return (
     <div className="host-present">
+      <button className="btn ghost tiny corner-lobby" onClick={backToLobby}>← 로비</button>
       <h2>Q{lb.order} 리더보드</h2>
       <AnswerReveal lb={lb} />
       <div className="lb-list host-lb">

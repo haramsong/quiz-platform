@@ -1,11 +1,8 @@
 import { useState, useEffect, useRef } from 'react';
 import { toWebp } from '../utils/webp';
 import { uploadImage } from '../utils/upload';
-import { colorHex } from '../constants';
 
 const API = import.meta.env.VITE_API_URL;
-const COLORS = ['red','blue','yellow','green','purple','orange'];
-const LABELS = ['A','B','C','D','E','F'];
 
 async function apiCall(path, code, pin, { method = 'GET', body } = {}) {
   const res = await fetch(`${API}${path}`, {
@@ -285,8 +282,8 @@ function QuestionEditor({ q, idx, onChange, onDelete, onImage, saving }) {
           <label>보기 {q.type === 'SINGLE' ? '(정답 1개 선택)' : '(정답 여러 개 선택)'}</label>
           {(q.choices || []).map((c, i) => (
             <div key={c.id} className="choice-row">
-              <span className="choice-label" style={{ background: colorHex(COLORS[i]) }}>{LABELS[i]}</span>
-              <input value={c.text} onChange={e => setChoiceText(i, e.target.value)} placeholder={`보기 ${LABELS[i]}`} />
+              <span className="choice-label plain">{i + 1}</span>
+              <input value={c.text} onChange={e => setChoiceText(i, e.target.value)} placeholder={`보기 ${i + 1}`} />
               <label className="choice-check">
                 <input type={q.type === 'SINGLE' ? 'radio' : 'checkbox'} name="correct" checked={(q.correctChoiceIds || []).includes(c.id)} onChange={() => toggleCorrect(c.id)} />
                 정답

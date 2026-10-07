@@ -125,9 +125,11 @@ export default function PlayerApp({ initialCode }) {
     return (
       <div className="player-answer">
         <div className="top-bar">
-          <span className="q-num">Q{q.order}/{q.total}</span>
-          <span className="points-badge">{q.points || 1}점</span>
-          {submitted && <span className="submitted-badge">✅ 제출 완료</span>}
+          <div className="top-left">
+            <span className="q-num">Q{q.order}/{q.total}</span>
+            <span className="points-badge">{q.points || 1}점</span>
+          </div>
+          <span className="submitted-badge" style={{ visibility: submitted ? 'visible' : 'hidden' }}>✅ 제출 완료</span>
         </div>
         <div className={`progress-bar ${frac <= 0.25 ? 'urgent' : ''}`}>
           <div className="progress-fill" style={{ width: `${frac * 100}%` }} />
