@@ -15,7 +15,7 @@ async function apiCall(path, code, pin, { method = 'GET', body } = {}) {
   return res.json();
 }
 
-export default function SetupPage({ code, pin, quizData, onRefresh, onStartQuiz }) {
+export default function SetupPage({ code, pin, quizData, onRefresh, onStartQuiz, onResetGame, resetting }) {
   const [title, setTitle] = useState(quizData?.title || '');
   const [timeout, setTimeout_] = useState(quizData?.timeoutSec || 20);
   const [prizeWinners, setPrize] = useState(quizData?.prizeWinners || 1);
@@ -153,6 +153,11 @@ export default function SetupPage({ code, pin, quizData, onRefresh, onStartQuiz 
         <h2>📝 퀴즈 세팅 — <code>{code}</code></h2>
         <div className="setup-actions">
           {msg && <span className="msg">{msg}</span>}
+          {onResetGame && (
+            <button className="btn ghost" onClick={onResetGame} disabled={resetting} title="참가자·점수·지난 결과 삭제 (문제는 유지)">
+              ♻️ 게임 초기화
+            </button>
+          )}
           <button className="btn save-all" onClick={saveAll} disabled={saving}>
             💾 전체 저장
           </button>

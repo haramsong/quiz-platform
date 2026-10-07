@@ -4,6 +4,7 @@ import { connect, send, disconnect } from '../ws';
 import { colorHex } from '../constants';
 import SetupPage from './SetupPage';
 import { JoinToastContainer, createToast } from './JoinToast';
+import PlayQR from './PlayQR';
 import AnswerReveal from '../AnswerReveal';
 
 const Phase = { LOGIN: 'login', SETUP: 'setup', LOBBY: 'lobby', QUESTION: 'question', LB: 'lb', RESULT: 'result', PAST_RESULT: 'past_result' };
@@ -176,15 +177,18 @@ export default function HostApp({ initialCode }) {
   );
 
   if (phase === Phase.SETUP) return (
-    <SetupPage code={code} pin={pin} quizData={quizData} onRefresh={refreshQuiz} onStartQuiz={goLobby} />
+    <SetupPage code={code} pin={pin} quizData={quizData} onRefresh={refreshQuiz} onStartQuiz={goLobby} onResetGame={resetGame} resetting={busy} />
   );
 
   if (phase === Phase.LOBBY) return (
     <div className="host-present center">
-      {quizData?.thumbnailUrl && <img src={quizData.thumbnailUrl} alt="" className="lobby-thumb" />}
       <h1 className="lobby-title">{quizData?.title || code}</h1>
+      <div className="lobby-join-row">
+        {quizData?.thumbnailUrl && <img src={quizData.thumbnailUrl} alt="" className="lobby-thumb" />}
+        <PlayQR code={code} size={220} />
+      </div>
       <p className="big-count">{playerCount}명 참여</p>
-      <p className="muted">참여자가 입장하면 숫자가 올라갑니다.</p>
+      <p className="muted">QR을 스캔하거나 링크로 입장하세요.</p>
       {sessionInfo?.hasResult && (
         <p className="prior-note">⚠️ 이전 게임 결과가 저장되어 있습니다. 시작 시 초기화됩니다.</p>
       )}
@@ -193,7 +197,6 @@ export default function HostApp({ initialCode }) {
         {sessionInfo?.hasResult && (
           <button className="btn ghost" onClick={viewPastResult}>📊 지난 결과 보기</button>
         )}
-        <button className="btn ghost" onClick={resetGame} disabled={busy}>♻️ 게임 초기화</button>
       </div>
       <JoinToastContainer toasts={toasts} />
     </div>

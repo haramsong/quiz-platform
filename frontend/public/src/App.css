@@ -243,3 +243,11 @@ h1, h2, .player-q-body, .choice-line, .host-choice .text, .big-count,
 /* ===== Lobby sub-actions (reset / past result) ===== */
 .lobby-subactions { display: flex; gap: .75rem; justify-content: center; margin-top: 1.25rem; flex-wrap: wrap; }
 .prior-note { color: #fcd34d; font-size: .9rem; margin-top: .5rem; }
+
+
+/* ===== Lobby join row (thumbnail + QR same line) ===== */
+.lobby-join-row { display: flex; gap: 1.5rem; align-items: center; justify-content: center; flex-wrap: wrap; margin: 1rem 0; }
+.lobby-join-row .lobby-thumb { margin-bottom: 0; }
+.play-qr { display: flex; flex-direction: column; align-items: center; gap: .5rem; }
+.play-qr img { border-radius: 12px; background: #fff; padding: 8px; box-shadow: 0 6px 24px rgba(0,0,0,.4); }
+.play-qr-url { font-size: .8rem; color: var(--muted); word-break: break-all; max-width: 260px; text-align: center; }
