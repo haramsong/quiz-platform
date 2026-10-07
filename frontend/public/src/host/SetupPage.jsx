@@ -54,15 +54,15 @@ export default function SetupPage({ code, pin, quizData, onRefresh, onStartQuiz 
       await apiCall('/quizzes', code, pin, { method: 'POST', body: { code, title, timeoutSec: timeout, prizeWinners, thumbnailKey } });
       const snapshot = questions;
       for (const q of snapshot) {
-        const body = { ...q }; delete body._new; delete body.imageUrl;
+        const body = { ...q }; delete body._new; delete body._dirty; delete body.imageUrl;
         if (q._new) {
           await apiCall(`/quizzes/${code}/questions`, code, pin, { method: 'POST', body });
         } else {
           await apiCall(`/quizzes/${code}/questions/${q.order}`, code, pin, { method: 'PUT', body });
         }
       }
-      // clear _new flags locally
-      setQuestions((prev) => prev.map((q) => ({ ...q, _new: false })));
+      // clear _new / _dirty flags locally (all saved)
+      setQuestions((prev) => prev.map((q) => ({ ...q, _new: false, _dirty: false })));
       setMsg(`전체 저장 완료 (${snapshot.length}문제)`);
     } catch {
       setMsg('저장 실패 — 다시 시도하세요');
@@ -83,7 +83,8 @@ export default function SetupPage({ code, pin, quizData, onRefresh, onStartQuiz 
   const updateQ = (idx, patch) => {
     setQuestions((prev) => {
       const copy = [...prev];
-      copy[idx] = { ...copy[idx], ...patch };
+      // mark dirty on any edit (unless it's a brand-new question, which is already flagged)
+      copy[idx] = { ...copy[idx], ...patch, _dirty: copy[idx]._new ? false : true };
       return copy;
     });
   };
@@ -182,10 +183,11 @@ export default function SetupPage({ code, pin, quizData, onRefresh, onStartQuiz 
             <div className="panel-head"><h3>문제 목록</h3><button className="btn tiny primary" onClick={addQuestion}>+ 추가</button></div>
             <div className="q-list">
               {questions.map((q, i) => (
-                <div key={i} className={`q-item ${i === selIdx ? 'sel' : ''}`} onClick={() => setSelIdx(i)}>
+                <div key={i} className={`q-item ${i === selIdx ? 'sel' : ''} ${(q._dirty || q._new) ? 'dirty' : ''}`} onClick={() => setSelIdx(i)}>
                   <span className="q-order">Q{q.order}</span>
                   <span className="q-type">{q.type}</span>
                   <span className="q-body-preview">{q.body?.slice(0, 30) || '(빈 문제)'}</span>
+                  {(q._dirty || q._new) && <span className="dirty-dot" title="저장되지 않은 변경">●</span>}
                 </div>
               ))}
               {questions.length === 0 && <p className="muted small">문제를 추가하세요.</p>}
@@ -255,11 +257,9 @@ function QuestionEditor({ q, idx, onChange, onDelete, onImage, saving }) {
     <div className="q-editor">
       <div className="q-editor-head">
         <h3>Q{q.order} 편집</h3>
-        <div className="q-editor-actions">
-          <span className="muted small">변경 후 상단 "전체 저장"을 누르세요</span>
-          <button className="btn danger tiny" onClick={onDelete}>삭제</button>
-        </div>
+        <button className="btn danger tiny" onClick={onDelete}>삭제</button>
       </div>
+      <p className="editor-hint muted small">변경 사항은 상단 <strong>전체 저장</strong>을 눌러야 반영됩니다.</p>
 
       <div className="field">
         <label>문제 유형</label>
@@ -317,7 +317,7 @@ function QuestionEditor({ q, idx, onChange, onDelete, onImage, saving }) {
       </div>
 
       <div className="field">
-        <label>이미지 (선택, WebP 자동 변환)</label>
+        <label>이미지 (선택)</label>
         <label className="file-btn">
           {(q.imageUrl || q.imageKey) ? '🖼️ 이미지 변경' : '🖼️ 이미지 업로드'}
           <input type="file" accept="image/*" onChange={onImage} hidden />

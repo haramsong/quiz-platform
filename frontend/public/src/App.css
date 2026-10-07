@@ -2,9 +2,18 @@
   --bg: #0f172a; --panel: #1e293b; --border: #334155;
   --text: #e2e8f0; --muted: #94a3b8;
   --primary: #7c3aed; --danger: #e11d48;
+  --font-body: 'Pretendard', system-ui, -apple-system, 'Apple SD Gothic Neo', 'Malgun Gothic', sans-serif;
+  --font-display: 'Jua', var(--font-body);
 }
 * { box-sizing: border-box; }
-body { margin: 0; font-family: system-ui, sans-serif; background: var(--bg); color: var(--text); }
+body { margin: 0; font-family: var(--font-body); background: var(--bg); color: var(--text); }
+
+/* playful display font for titles, choices, timer, big numbers */
+h1, h2, .player-q-body, .choice-line, .host-choice .text, .big-count,
+.lobby-title, .answer-value, .points-badge, .big-rank, .q-num {
+  font-family: var(--font-display);
+  letter-spacing: .01em;
+}
 
 .center { min-height: 100vh; min-height: 100dvh; display: grid; place-content: center; text-align: center; padding: 1.5rem; }
 .center-text { text-align: center; }
@@ -222,3 +231,10 @@ body { margin: 0; font-family: system-ui, sans-serif; background: var(--bg); col
 
 
 
+
+
+/* ===== Unsaved (dirty) question indicator ===== */
+.q-item { position: relative; }
+.q-item.dirty { border-color: #f59e0b; box-shadow: inset 3px 0 0 #f59e0b; }
+.dirty-dot { color: #f59e0b; font-size: .7rem; margin-left: auto; }
+.editor-hint { margin: 0 0 1rem; }

@@ -8,15 +8,18 @@
   --danger: #e11d48;
   --warn: #d97706;
   --border: #3b2b63;
+  --font-body: 'Pretendard', system-ui, -apple-system, 'Apple SD Gothic Neo', 'Malgun Gothic', sans-serif;
+  --font-display: 'Jua', var(--font-body);
 }
 
 * { box-sizing: border-box; }
 body {
   margin: 0;
-  font-family: system-ui, -apple-system, sans-serif;
+  font-family: var(--font-body);
   background: var(--bg);
   color: var(--text);
 }
+h1, .center-card h1 { font-family: var(--font-display); letter-spacing: .01em; }
 
 .center-card {
   min-height: 100vh;
