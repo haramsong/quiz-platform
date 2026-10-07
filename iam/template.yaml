@@ -65,7 +65,11 @@ Resources:
               StringEquals:
                 token.actions.githubusercontent.com:aud: sts.amazonaws.com
               StringLike:
-                token.actions.githubusercontent.com:sub: !Sub "repo:${GitHubOrg}/${GitHubRepo}:ref:refs/heads/${GitHubBranch}"
+                # GitHub may use an immutable subject claim that appends unique
+                # numeric IDs (e.g. repo:org@123/repo@456:ref:...). The wildcards
+                # tolerate both the classic and immutable sub formats while still
+                # pinning the org, repo, and branch.
+                token.actions.githubusercontent.com:sub: !Sub "repo:${GitHubOrg}*/${GitHubRepo}*:ref:refs/heads/${GitHubBranch}"
       Policies:
         - PolicyName: AssumeDeployRolesOnly
           PolicyDocument:
@@ -98,6 +102,14 @@ Resources:
           PolicyDocument:
             Version: '2012-10-17'
             Statement:
+              # SAM macro transform (CloudFormation runs the Serverless transform
+              # under this service role, which needs CreateChangeSet on the transform)
+              - Sid: SamTransform
+                Effect: Allow
+                Action:
+                  - cloudformation:CreateChangeSet
+                Resource:
+                  - "arn:aws:cloudformation:*:aws:transform/Serverless-2016-10-31"
               # application runtime resources
               - Sid: AppResources
                 Effect: Allow
