@@ -214,8 +214,16 @@ async function endQuiz(code, meta) {
   });
   const players = await queryByPk(PK(code), 'PLAYER#');
   const ranking = drawWinners(players, meta?.prizeWinners || 1);
-  await broadcast(code, {
-    type: 'final_result', ranking, prizeWinners: meta?.prizeWinners || 1,
-  });
+  const prizeWinners = meta?.prizeWinners || 1;
+
+  // persist a snapshot so the host can review it later (lottery is non-reproducible)
+  const session = await getItem(PK(code), SK.session());
+  await putItem({
+    PK: PK(code), SK: 'RESULT#final', entityType: 'RESULT',
+    ranking, prizeWinners, endedAt: Date.now(),
+    expireAt: session?.expireAt,
+  }).catch(() => {});
+
+  await broadcast(code, { type: 'final_result', ranking, prizeWinners });
   return ok();
 }

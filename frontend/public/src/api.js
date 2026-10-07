@@ -15,4 +15,7 @@ export const api = {
   join: (code, nickname) => call('/sessions/join', { method: 'POST', body: { code, nickname } }),
   postQuiz: (code, pin, body) => call('/quizzes', { method: 'POST', headers: { 'x-host-auth': `${code}:${pin}` }, body: { code, ...body } }),
   getQuiz: (code, pin) => call(`/quizzes/${encodeURIComponent(code)}`, { headers: { 'x-host-auth': `${code}:${pin}` } }),
+  getSession: (code, pin) => call(`/quizzes/${encodeURIComponent(code)}/session`, { headers: { 'x-host-auth': `${code}:${pin}` } }),
+  getResult: (code, pin) => call(`/quizzes/${encodeURIComponent(code)}/result`, { headers: { 'x-host-auth': `${code}:${pin}` } }),
+  resetGame: (code, pin) => call(`/quizzes/${encodeURIComponent(code)}/reset`, { method: 'POST', headers: { 'x-host-auth': `${code}:${pin}` } }),
 };

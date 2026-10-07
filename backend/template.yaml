@@ -315,6 +315,24 @@ Resources:
             ApiId: !Ref HttpApi
             Path: "/quizzes/{code}/questions/{order}"
             Method: DELETE
+        GetSession:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref HttpApi
+            Path: "/quizzes/{code}/session"
+            Method: GET
+        GetResult:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref HttpApi
+            Path: "/quizzes/{code}/result"
+            Method: GET
+        ResetGame:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref HttpApi
+            Path: "/quizzes/{code}/reset"
+            Method: POST
 
   # ---------------- Lambda: Player ----------------
   PlayerFunction:

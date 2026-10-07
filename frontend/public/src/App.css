@@ -238,3 +238,8 @@ h1, h2, .player-q-body, .choice-line, .host-choice .text, .big-count,
 .q-item.dirty { border-color: #f59e0b; box-shadow: inset 3px 0 0 #f59e0b; }
 .dirty-dot { color: #f59e0b; font-size: .7rem; margin-left: auto; }
 .editor-hint { margin: 0 0 1rem; }
+
+
+/* ===== Lobby sub-actions (reset / past result) ===== */
+.lobby-subactions { display: flex; gap: .75rem; justify-content: center; margin-top: 1.25rem; flex-wrap: wrap; }
+.prior-note { color: #fcd34d; font-size: .9rem; margin-top: .5rem; }

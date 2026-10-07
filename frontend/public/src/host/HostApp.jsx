@@ -6,7 +6,7 @@ import SetupPage from './SetupPage';
 import { JoinToastContainer, createToast } from './JoinToast';
 import AnswerReveal from '../AnswerReveal';
 
-const Phase = { LOGIN: 'login', SETUP: 'setup', LOBBY: 'lobby', QUESTION: 'question', LB: 'lb', RESULT: 'result' };
+const Phase = { LOGIN: 'login', SETUP: 'setup', LOBBY: 'lobby', QUESTION: 'question', LB: 'lb', RESULT: 'result', PAST_RESULT: 'past_result' };
 
 export default function HostApp({ initialCode }) {
   const [phase, setPhase] = useState(Phase.LOGIN);
@@ -18,6 +18,9 @@ export default function HostApp({ initialCode }) {
   const [quizData, setQuizData] = useState(null);
   const [playerCount, setPcount] = useState(0);
   const [toasts, setToasts] = useState([]);
+  const [sessionInfo, setSessionInfo] = useState(null); // { state, playerCount, hasResult }
+  const [pastResult, setPastResult] = useState(null);    // getResult snapshot
+  const [busy, setBusy] = useState(false);
 
   const [question, setQuestion] = useState(null);
   const [answered, setAnswered] = useState(0);
@@ -102,13 +105,62 @@ export default function HostApp({ initialCode }) {
     } finally { setLoading(false); }
   };
 
-  const goLobby = () => {
+  const refreshSession = useCallback(async () => {
+    try {
+      const s = await api.getSession(code, pin);
+      setSessionInfo(s);
+      setPcount(s.playerCount || 0);
+      return s;
+    } catch { return null; }
+  }, [code, pin]);
+
+  const goLobby = async () => {
     connect({ code, role: 'host' }, handleWs);
+    await refreshSession();
     setPhase(Phase.LOBBY);
   };
 
-  const doStart = () => send({ action: 'start' });
+  const doStart = async () => {
+    // if there is leftover participation data or a finished result, confirm reset first
+    const s = sessionInfo || (await refreshSession());
+    const hasPrior = (s?.playerCount || 0) > 0 || s?.hasResult || (s?.state && s.state !== 'WAITING');
+    if (hasPrior) {
+      const okReset = window.confirm(
+        '이전 게임 데이터가 있습니다.\n초기화하고 새로 시작할까요?\n(참가자·점수·지난 결과가 삭제됩니다)'
+      );
+      if (!okReset) return;
+      setBusy(true);
+      try { await api.resetGame(code, pin); } catch { /* ignore */ }
+      setBusy(false);
+      setPcount(0);
+      setSessionInfo({ state: 'WAITING', playerCount: 0, hasResult: false });
+    }
+    send({ action: 'start' });
+  };
+
   const doNext = () => send({ action: 'next' });
+
+  const resetGame = async () => {
+    if (!window.confirm('게임을 초기화할까요?\n참가자·점수·지난 결과가 삭제됩니다. (문제는 유지)')) return;
+    setBusy(true);
+    try {
+      await api.resetGame(code, pin);
+      setPcount(0);
+      setSessionInfo({ state: 'WAITING', playerCount: 0, hasResult: false });
+      setPastResult(null);
+    } catch { /* ignore */ }
+    setBusy(false);
+  };
+
+  const viewPastResult = async () => {
+    try {
+      const r = await api.getResult(code, pin);
+      setPastResult(r);
+      setPhase(Phase.PAST_RESULT);
+    } catch (ex) {
+      alert(ex.code === 'NO_RESULT' ? '저장된 지난 결과가 없습니다.' : '결과 조회 실패');
+    }
+  };
 
   // ---- RENDER ----
   if (phase === Phase.LOGIN) return (
@@ -133,8 +185,39 @@ export default function HostApp({ initialCode }) {
       <h1 className="lobby-title">{quizData?.title || code}</h1>
       <p className="big-count">{playerCount}명 참여</p>
       <p className="muted">참여자가 입장하면 숫자가 올라갑니다.</p>
-      <button className="btn primary big" onClick={doStart}>🚀 퀴즈 시작</button>
+      {sessionInfo?.hasResult && (
+        <p className="prior-note">⚠️ 이전 게임 결과가 저장되어 있습니다. 시작 시 초기화됩니다.</p>
+      )}
+      <button className="btn primary big" onClick={doStart} disabled={busy}>🚀 퀴즈 시작</button>
+      <div className="lobby-subactions">
+        {sessionInfo?.hasResult && (
+          <button className="btn ghost" onClick={viewPastResult}>📊 지난 결과 보기</button>
+        )}
+        <button className="btn ghost" onClick={resetGame} disabled={busy}>♻️ 게임 초기화</button>
+      </div>
       <JoinToastContainer toasts={toasts} />
+    </div>
+  );
+
+  if (phase === Phase.PAST_RESULT && pastResult) return (
+    <div className="host-present">
+      <h2>📊 지난 게임 결과</h2>
+      {pastResult.endedAt && (
+        <p className="muted center-text">
+          {new Date(pastResult.endedAt).toLocaleString('ko-KR')} 종료
+        </p>
+      )}
+      <div className="lb-list host-lb">
+        {pastResult.ranking.map((r, i) => (
+          <div key={i} className={`lb-row big ${r.isWinner ? 'winner-row' : ''}`}>
+            <span className="rank">#{r.rank}</span>
+            <span className="name">{r.nickname}</span>
+            <span className="pts">{r.totalScore}점 ({r.totalTimeSec}s)</span>
+            {r.isWinner && <span className="badge-win">{r.winReason === 'FIRST' ? '🥇' : '🎁'}</span>}
+          </div>
+        ))}
+      </div>
+      <button className="btn ghost big next-btn" onClick={() => setPhase(Phase.LOBBY)}>← 로비로</button>
     </div>
   );
 
@@ -201,6 +284,7 @@ export default function HostApp({ initialCode }) {
           </div>
         ))}
       </div>
+      <button className="btn ghost big next-btn" onClick={async () => { await refreshSession(); setPhase(Phase.LOBBY); }}>← 로비로</button>
     </div>
   );
 

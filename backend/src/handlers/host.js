@@ -1,7 +1,8 @@
 // Host handler: quiz meta (title/thumbnail), questions CRUD, image presign.
 import { ok, created, error, parseBody, nowSec } from '../lib/http.js';
-import { PK, SK, getItem, putItem, deleteItem, queryByPk, updateItem } from '../lib/ddb.js';
+import { PK, SK, getItem, putItem, deleteItem, queryByPk, queryGsi1, batchDelete, updateItem } from '../lib/ddb.js';
 import { parseHostAuth, verifyPin } from '../lib/auth.js';
+import { CONN_INDEX } from '../lib/broadcast.js';
 import { s3, IMAGE_BUCKET } from '../lib/clients.js';
 import { PutObjectCommand, GetObjectCommand } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
@@ -24,12 +25,73 @@ export const handler = async (event) => {
 
   if (method === 'POST' && path === '/quizzes') return postQuiz(event);
   if (method === 'GET' && path.match(/^\/quizzes\/[^/]+$/) && !path.includes('/questions')) return getQuiz(event);
+  if (method === 'GET' && path.endsWith('/session')) return getSession(event);
+  if (method === 'GET' && path.endsWith('/result')) return getResult(event);
+  if (method === 'POST' && path.endsWith('/reset')) return resetGame(event);
   if (method === 'POST' && path.endsWith('/questions')) return postQuestion(event);
   if (method === 'PUT' && path.match(/\/questions\/\d+$/)) return putQuestion(event);
   if (method === 'DELETE' && path.match(/\/questions\/\d+$/)) return delQuestion(event);
   if (method === 'POST' && path.endsWith('/images')) return presign(event);
   return error(404, 'NOT_FOUND', 'Unknown host route');
 };
+
+// ---- Session status: player count, state, whether a result exists ----
+async function getSession(event) {
+  const code = codeFrom(event);
+  if (!(await authHost(event, code))) return error(403, 'INVALID_PIN', 'host auth failed');
+  const session = await getItem(PK(code), SK.session());
+  const players = await queryByPk(PK(code), 'PLAYER#');
+  const result = await getItem(PK(code), 'RESULT#final');
+  return ok({
+    code,
+    state: session?.state || 'WAITING',
+    playerCount: players.length,
+    hasResult: !!result,
+  });
+}
+
+// ---- Final result snapshot (last finished game) ----
+async function getResult(event) {
+  const code = codeFrom(event);
+  if (!(await authHost(event, code))) return error(403, 'INVALID_PIN', 'host auth failed');
+  const result = await getItem(PK(code), 'RESULT#final');
+  if (!result) return error(404, 'NO_RESULT', 'no finished game result yet');
+  return ok({
+    code,
+    ranking: result.ranking || [],
+    prizeWinners: result.prizeWinners || 1,
+    endedAt: result.endedAt || null,
+  });
+}
+
+// ---- Reset game: wipe participation data, keep quiz/questions ----
+async function resetGame(event) {
+  const code = codeFrom(event);
+  if (!(await authHost(event, code))) return error(403, 'INVALID_PIN', 'host auth failed');
+  const players = await queryByPk(PK(code), 'PLAYER#', { ttlGuard: false });
+  const answers = await queryByPk(PK(code), 'ANSWER#', { ttlGuard: false });
+  const conns = await queryGsi1(CONN_INDEX(code));
+  const result = await getItem(PK(code), 'RESULT#final');
+
+  const keyMap = new Map();
+  const addKey = (pk, sk) => keyMap.set(`${pk}\u0000${sk}`, { PK: pk, SK: sk });
+  for (const i of players) addKey(i.PK, i.SK);
+  for (const i of answers) addKey(i.PK, i.SK);
+  for (const c of conns) {
+    addKey(c.PK, c.SK);
+    if (c.connectionId) addKey(`CONNPTR#${c.connectionId}`, `CONNPTR#${c.connectionId}`);
+  }
+  if (result) addKey(PK(code), 'RESULT#final');
+  await batchDelete([...keyMap.values()]);
+
+  const codeItem = await getItem(PK(code), SK.code(code));
+  const expireAt = codeItem?.expireAt || nowSec() + 7 * 24 * 3600;
+  await putItem({
+    PK: PK(code), SK: SK.session(), entityType: 'SESSION',
+    state: 'WAITING', currentOrder: 0, questionStartedAt: null, playerCount: 0, expireAt,
+  });
+  return ok({ code, reset: true, state: 'WAITING', removed: { players: players.length, answers: answers.length } });
+}
 
 // ---- Quiz meta (create/update) + title update on CODE item ----
 async function postQuiz(event) {
