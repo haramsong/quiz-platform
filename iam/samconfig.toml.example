@@ -1,0 +1,18 @@
+version = 0.1
+
+# Copy this file to `samconfig.toml` and fill in your values:
+#   cp samconfig.toml.example samconfig.toml
+# `samconfig.toml` is gitignored (holds account/profile-specific values).
+
+[default.global.parameters]
+stack_name = "quiz-platform-cicd"
+
+[default.deploy.parameters]
+stack_name = "quiz-platform-cicd"
+region = "ap-northeast-2"
+profile = "<YOUR_AWS_PROFILE>"
+capabilities = "CAPABILITY_NAMED_IAM"
+confirm_changeset = false
+# GitHubOrg / GitHubRepo : your repository owner and name
+# CreateOidcProvider      : 'false' if the GitHub OIDC provider already exists
+parameter_overrides = "GitHubOrg=<YOUR_GITHUB_ORG> GitHubRepo=<YOUR_REPO> GitHubBranch=main AppStackName=quiz-platform CreateOidcProvider=false"

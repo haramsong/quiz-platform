@@ -1,0 +1,24 @@
+version = 0.1
+
+# Copy this file to `samconfig.toml` and fill in your values:
+#   cp samconfig.toml.example samconfig.toml
+# `samconfig.toml` is gitignored (holds account/profile-specific values).
+# NOTE: In CI the profile is not used (OIDC role credentials are injected),
+#       and the CloudFormation service role is passed via --role-arn.
+
+[default.global.parameters]
+stack_name = "quiz-platform"
+
+[default.build.parameters]
+cached = true
+parallel = true
+
+[default.deploy.parameters]
+stack_name = "quiz-platform"
+region = "ap-northeast-2"
+profile = "<YOUR_AWS_PROFILE>"
+resolve_s3 = true
+capabilities = "CAPABILITY_IAM"
+confirm_changeset = false
+disable_rollback = false
+parameter_overrides = "MasterKeyParamName=/quiz-platform/master-key WsStageName=prod"

@@ -1,0 +1,482 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: Serverless Quiz Platform (MVP)
+
+Parameters:
+  MasterKeyParamName:
+    Type: String
+    Default: /quiz-platform/master-key
+    Description: SSM SecureString parameter name holding the master key (value not stored in template)
+  WsStageName:
+    Type: String
+    Default: prod
+
+Globals:
+  Function:
+    Runtime: nodejs24.x
+    Timeout: 10
+    MemorySize: 256
+    Architectures: [arm64]
+    Environment:
+      Variables:
+        TABLE_NAME: !Ref QuizTable
+        IMAGE_BUCKET: !Ref ImageBucket
+
+Resources:
+
+  # ---------------- DynamoDB ----------------
+  QuizTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - { AttributeName: PK, AttributeType: S }
+        - { AttributeName: SK, AttributeType: S }
+        - { AttributeName: GSI1PK, AttributeType: S }
+        - { AttributeName: GSI1SK, AttributeType: S }
+      KeySchema:
+        - { AttributeName: PK, KeyType: HASH }
+        - { AttributeName: SK, KeyType: RANGE }
+      GlobalSecondaryIndexes:
+        - IndexName: GSI1
+          KeySchema:
+            - { AttributeName: GSI1PK, KeyType: HASH }
+            - { AttributeName: GSI1SK, KeyType: RANGE }
+          Projection: { ProjectionType: ALL }
+      TimeToLiveSpecification:
+        AttributeName: expireAt
+        Enabled: true
+      StreamSpecification:
+        StreamViewType: OLD_IMAGE
+
+  # ---------------- S3 ----------------
+  WebBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+
+  MasterWebBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+
+  ImageBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      LifecycleConfiguration:
+        Rules:
+          - Id: ExpireImages
+            Status: Enabled
+            ExpirationInDays: 90
+      CorsConfiguration:
+        CorsRules:
+          - AllowedMethods: [PUT, GET]
+            AllowedOrigins: ['*']
+            AllowedHeaders: ['*']
+
+  # ---------------- CloudFront OAC ----------------
+  PublicOAC:
+    Type: AWS::CloudFront::OriginAccessControl
+    Properties:
+      OriginAccessControlConfig:
+        Name: !Sub "${AWS::StackName}-public-oac"
+        OriginAccessControlOriginType: s3
+        SigningBehavior: always
+        SigningProtocol: sigv4
+
+  MasterOAC:
+    Type: AWS::CloudFront::OriginAccessControl
+    Properties:
+      OriginAccessControlConfig:
+        Name: !Sub "${AWS::StackName}-master-oac"
+        OriginAccessControlOriginType: s3
+        SigningBehavior: always
+        SigningProtocol: sigv4
+
+  # ---------------- CloudFront distributions ----------------
+  PublicDistribution:
+    Type: AWS::CloudFront::Distribution
+    Properties:
+      DistributionConfig:
+        Enabled: true
+        DefaultRootObject: index.html
+        Origins:
+          - Id: web
+            DomainName: !GetAtt WebBucket.RegionalDomainName
+            OriginAccessControlId: !GetAtt PublicOAC.Id
+            S3OriginConfig:
+              OriginAccessIdentity: ''
+        DefaultCacheBehavior:
+          TargetOriginId: web
+          ViewerProtocolPolicy: redirect-to-https
+          CachePolicyId: 658327ea-f89d-4fab-a63d-7e88639e58f6  # Managed-CachingOptimized
+        CustomErrorResponses:
+          - { ErrorCode: 403, ResponseCode: 200, ResponsePagePath: /index.html }
+          - { ErrorCode: 404, ResponseCode: 200, ResponsePagePath: /index.html }
+
+  MasterDistribution:
+    Type: AWS::CloudFront::Distribution
+    Properties:
+      DistributionConfig:
+        Enabled: true
+        DefaultRootObject: index.html
+        Origins:
+          - Id: master-web
+            DomainName: !GetAtt MasterWebBucket.RegionalDomainName
+            OriginAccessControlId: !GetAtt MasterOAC.Id
+            S3OriginConfig:
+              OriginAccessIdentity: ''
+        DefaultCacheBehavior:
+          TargetOriginId: master-web
+          ViewerProtocolPolicy: redirect-to-https
+          CachePolicyId: 658327ea-f89d-4fab-a63d-7e88639e58f6
+        CustomErrorResponses:
+          - { ErrorCode: 403, ResponseCode: 200, ResponsePagePath: /index.html }
+          - { ErrorCode: 404, ResponseCode: 200, ResponsePagePath: /index.html }
+
+  WebBucketPolicy:
+    Type: AWS::S3::BucketPolicy
+    Properties:
+      Bucket: !Ref WebBucket
+      PolicyDocument:
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: cloudfront.amazonaws.com
+            Action: s3:GetObject
+            Resource: !Sub "${WebBucket.Arn}/*"
+            Condition:
+              StringEquals:
+                AWS:SourceArn: !Sub "arn:aws:cloudfront::${AWS::AccountId}:distribution/${PublicDistribution}"
+
+  MasterWebBucketPolicy:
+    Type: AWS::S3::BucketPolicy
+    Properties:
+      Bucket: !Ref MasterWebBucket
+      PolicyDocument:
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: cloudfront.amazonaws.com
+            Action: s3:GetObject
+            Resource: !Sub "${MasterWebBucket.Arn}/*"
+            Condition:
+              StringEquals:
+                AWS:SourceArn: !Sub "arn:aws:cloudfront::${AWS::AccountId}:distribution/${MasterDistribution}"
+
+  # ---------------- HTTP API ----------------
+  HttpApi:
+    Type: AWS::Serverless::HttpApi
+    Properties:
+      CorsConfiguration:
+        AllowOrigins: ['*']
+        AllowMethods: [GET, POST, PUT, DELETE, OPTIONS]
+        AllowHeaders: [content-type, x-master-key, x-host-auth]
+      Auth:
+        Authorizers:
+          MasterAuthorizer:
+            FunctionArn: !GetAtt MasterAuthorizerFunction.Arn
+            FunctionInvokeRole: !GetAtt AuthorizerInvokeRole.Arn
+            Identity:
+              Headers: [X-Master-Key]
+            EnableSimpleResponses: true
+            AuthorizerPayloadFormatVersion: '2.0'
+
+  AuthorizerInvokeRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal: { Service: apigateway.amazonaws.com }
+            Action: sts:AssumeRole
+      Policies:
+        - PolicyName: InvokeAuthorizer
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action: lambda:InvokeFunction
+                Resource: !GetAtt MasterAuthorizerFunction.Arn
+
+  # ---------------- Lambda: Master Authorizer ----------------
+  MasterAuthorizerFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      Handler: src/handlers/masterAuthorizer.handler
+      Environment:
+        Variables:
+          MASTER_KEY_PARAM: !Ref MasterKeyParamName
+      Policies:
+        - Statement:
+            - Effect: Allow
+              Action: ['ssm:GetParameter']
+              Resource: !Sub "arn:aws:ssm:${AWS::Region}:${AWS::AccountId}:parameter${MasterKeyParamName}"
+            - Effect: Allow
+              Action: ['kms:Decrypt']
+              Resource: '*'
+
+  # ---------------- Lambda: Master ----------------
+  MasterFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      Handler: src/handlers/master.handler
+      Environment:
+        Variables:
+          PUBLIC_CDN_DOMAIN: !GetAtt PublicDistribution.DomainName
+      Policies:
+        - DynamoDBCrudPolicy: { TableName: !Ref QuizTable }
+        - S3CrudPolicy: { BucketName: !Ref ImageBucket }
+      Events:
+        PostCodes:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref HttpApi
+            Path: /codes
+            Method: POST
+            Auth:
+              Authorizer: MasterAuthorizer
+        GetCodes:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref HttpApi
+            Path: /codes
+            Method: GET
+            Auth:
+              Authorizer: MasterAuthorizer
+        DeleteCode:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref HttpApi
+            Path: "/codes/{code}"
+            Method: DELETE
+            Auth:
+              Authorizer: MasterAuthorizer
+        ResetCode:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref HttpApi
+            Path: "/codes/{code}/reset"
+            Method: POST
+            Auth:
+              Authorizer: MasterAuthorizer
+
+  # ---------------- Lambda: Host ----------------
+  HostFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      Handler: src/handlers/host.handler
+      Policies:
+        - DynamoDBCrudPolicy: { TableName: !Ref QuizTable }
+        - S3CrudPolicy: { BucketName: !Ref ImageBucket }
+      Events:
+        PostQuiz:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref HttpApi
+            Path: /quizzes
+            Method: POST
+        GetQuiz:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref HttpApi
+            Path: "/quizzes/{code}"
+            Method: GET
+        PostQuestion:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref HttpApi
+            Path: "/quizzes/{code}/questions"
+            Method: POST
+        PresignImage:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref HttpApi
+            Path: "/quizzes/{code}/images"
+            Method: POST
+        PutQuestion:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref HttpApi
+            Path: "/quizzes/{code}/questions/{order}"
+            Method: PUT
+        DeleteQuestion:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref HttpApi
+            Path: "/quizzes/{code}/questions/{order}"
+            Method: DELETE
+
+  # ---------------- Lambda: Player ----------------
+  PlayerFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      Handler: src/handlers/player.handler
+      Policies:
+        - DynamoDBCrudPolicy: { TableName: !Ref QuizTable }
+      Events:
+        JoinSession:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref HttpApi
+            Path: /sessions/join
+            Method: POST
+
+  # ---------------- WebSocket API ----------------
+  WebSocketApi:
+    Type: AWS::ApiGatewayV2::Api
+    Properties:
+      Name: !Sub "${AWS::StackName}-ws"
+      ProtocolType: WEBSOCKET
+      RouteSelectionExpression: "$request.body.action"
+
+  WsConnectFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      Handler: src/handlers/wsConnect.handler
+      Environment:
+        Variables:
+          WS_ENDPOINT: !Sub "https://${WebSocketApi}.execute-api.${AWS::Region}.amazonaws.com/${WsStageName}"
+      Policies:
+        - DynamoDBCrudPolicy: { TableName: !Ref QuizTable }
+        - Statement:
+            - Effect: Allow
+              Action: ['execute-api:ManageConnections']
+              Resource: !Sub "arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${WebSocketApi}/*"
+
+  WsDisconnectFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      Handler: src/handlers/wsDisconnect.handler
+      Policies:
+        - DynamoDBCrudPolicy: { TableName: !Ref QuizTable }
+
+  WsMessageFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      Handler: src/handlers/wsMessage.handler
+      Environment:
+        Variables:
+          WS_ENDPOINT: !Sub "https://${WebSocketApi}.execute-api.${AWS::Region}.amazonaws.com/${WsStageName}"
+      Policies:
+        - DynamoDBCrudPolicy: { TableName: !Ref QuizTable }
+        - S3ReadPolicy: { BucketName: !Ref ImageBucket }
+        - Statement:
+            - Effect: Allow
+              Action: ['execute-api:ManageConnections']
+              Resource: !Sub "arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${WebSocketApi}/*"
+
+  # WebSocket integrations
+  WsConnectIntegration:
+    Type: AWS::ApiGatewayV2::Integration
+    Properties:
+      ApiId: !Ref WebSocketApi
+      IntegrationType: AWS_PROXY
+      IntegrationUri: !Sub "arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${WsConnectFunction.Arn}/invocations"
+  WsDisconnectIntegration:
+    Type: AWS::ApiGatewayV2::Integration
+    Properties:
+      ApiId: !Ref WebSocketApi
+      IntegrationType: AWS_PROXY
+      IntegrationUri: !Sub "arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${WsDisconnectFunction.Arn}/invocations"
+  WsMessageIntegration:
+    Type: AWS::ApiGatewayV2::Integration
+    Properties:
+      ApiId: !Ref WebSocketApi
+      IntegrationType: AWS_PROXY
+      IntegrationUri: !Sub "arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${WsMessageFunction.Arn}/invocations"
+
+  # WebSocket routes
+  WsConnectRoute:
+    Type: AWS::ApiGatewayV2::Route
+    Properties:
+      ApiId: !Ref WebSocketApi
+      RouteKey: $connect
+      Target: !Sub "integrations/${WsConnectIntegration}"
+  WsDisconnectRoute:
+    Type: AWS::ApiGatewayV2::Route
+    Properties:
+      ApiId: !Ref WebSocketApi
+      RouteKey: $disconnect
+      Target: !Sub "integrations/${WsDisconnectIntegration}"
+  WsDefaultRoute:
+    Type: AWS::ApiGatewayV2::Route
+    Properties:
+      ApiId: !Ref WebSocketApi
+      RouteKey: $default
+      Target: !Sub "integrations/${WsMessageIntegration}"
+
+  WsStage:
+    Type: AWS::ApiGatewayV2::Stage
+    Properties:
+      ApiId: !Ref WebSocketApi
+      StageName: !Ref WsStageName
+      AutoDeploy: true
+
+  # Lambda permissions for WebSocket to invoke
+  WsConnectPermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      Action: lambda:InvokeFunction
+      FunctionName: !Ref WsConnectFunction
+      Principal: apigateway.amazonaws.com
+      SourceArn: !Sub "arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${WebSocketApi}/*"
+  WsDisconnectPermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      Action: lambda:InvokeFunction
+      FunctionName: !Ref WsDisconnectFunction
+      Principal: apigateway.amazonaws.com
+      SourceArn: !Sub "arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${WebSocketApi}/*"
+  WsMessagePermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      Action: lambda:InvokeFunction
+      FunctionName: !Ref WsMessageFunction
+      Principal: apigateway.amazonaws.com
+      SourceArn: !Sub "arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${WebSocketApi}/*"
+
+  # ---------------- Lambda: TTL Cleanup (DynamoDB Streams) ----------------
+  TtlCleanupFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      Handler: src/handlers/ttlCleanup.handler
+      Policies:
+        - S3CrudPolicy: { BucketName: !Ref ImageBucket }
+        - DynamoDBStreamReadPolicy: { TableName: !Ref QuizTable, StreamName: !Select [3, !Split ["/", !GetAtt QuizTable.StreamArn]] }
+      Events:
+        Stream:
+          Type: DynamoDB
+          Properties:
+            Stream: !GetAtt QuizTable.StreamArn
+            StartingPosition: LATEST
+            BatchSize: 25
+            MaximumRetryAttempts: 2
+            FilterCriteria:
+              Filters:
+                - Pattern: '{"eventName":["REMOVE"]}'
+
+Outputs:
+  HttpApiUrl:
+    Value: !Sub "https://${HttpApi}.execute-api.${AWS::Region}.amazonaws.com"
+  WsApiUrl:
+    Value: !Sub "wss://${WebSocketApi}.execute-api.${AWS::Region}.amazonaws.com/${WsStageName}"
+  PublicCdnDomain:
+    Value: !GetAtt PublicDistribution.DomainName
+  MasterCdnDomain:
+    Value: !GetAtt MasterDistribution.DomainName
+  WebBucket:
+    Value: !Ref WebBucket
+  MasterWebBucket:
+    Value: !Ref MasterWebBucket
+  ImageBucket:
+    Value: !Ref ImageBucket

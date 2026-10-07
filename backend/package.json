@@ -1,0 +1,20 @@
+{
+  "name": "quiz-platform-backend",
+  "version": "0.1.0",
+  "description": "Serverless quiz platform backend (MVP)",
+  "type": "module",
+  "engines": {
+    "node": ">=24"
+  },
+  "scripts": {
+    "test": "node --test"
+  },
+  "dependencies": {
+    "@aws-sdk/client-dynamodb": "3.651.1",
+    "@aws-sdk/lib-dynamodb": "3.651.1",
+    "@aws-sdk/client-ssm": "3.651.1",
+    "@aws-sdk/client-s3": "3.651.1",
+    "@aws-sdk/s3-request-presigner": "3.651.1",
+    "@aws-sdk/client-apigatewaymanagementapi": "3.651.1"
+  }
+}

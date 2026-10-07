@@ -1,0 +1,23 @@
+# Dependencies
+node_modules/
+
+# Build outputs
+dist/
+.aws-sam/
+
+# SAM / deploy config (per-account/profile — copy from *.example)
+samconfig.toml
+**/samconfig.toml
+
+# Environment files (API URLs are injected at build/CI time)
+.env
+.env.*
+!.env.example
+
+# Logs & OS
+*.log
+.DS_Store
+
+# Editor
+.vscode/
+.idea/

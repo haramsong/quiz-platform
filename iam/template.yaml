@@ -1,0 +1,261 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: >
+  GitHub Actions CI/CD IAM roles for the Quiz Platform.
+  OIDC role (assume-only) -> Backend deploy role + Frontend deploy role.
+
+Parameters:
+  GitHubOrg:
+    Type: String
+    Description: GitHub organization or user that owns the repository (e.g. my-org)
+  GitHubRepo:
+    Type: String
+    Description: Repository name (e.g. quiz-platform)
+  GitHubBranch:
+    Type: String
+    Default: main
+    Description: Branch allowed to assume the OIDC role
+  AppStackName:
+    Type: String
+    Default: quiz-platform
+    Description: Name of the application SAM stack (for scoping deploy permissions)
+  CreateOidcProvider:
+    Type: String
+    AllowedValues: ['true', 'false']
+    Default: 'true'
+    Description: Set 'false' if the GitHub OIDC provider already exists in the account
+
+Conditions:
+  ShouldCreateOidc: !Equals [!Ref CreateOidcProvider, 'true']
+
+Resources:
+
+  # ---------------- GitHub OIDC Identity Provider ----------------
+  GitHubOIDCProvider:
+    Type: AWS::IAM::OIDCProvider
+    Condition: ShouldCreateOidc
+    Properties:
+      Url: https://token.actions.githubusercontent.com
+      ClientIdList:
+        - sts.amazonaws.com
+      # Thumbprint is validated by AWS automatically for this well-known IdP,
+      # but a value is required by the resource. GitHub's current root CA thumbprint.
+      ThumbprintList:
+        - 6938fd4d98bab03faadb97b34396831e3780aea1
+        - 1c58a3a8518e8759bf075b76b750d4f2df264fcd
+
+  # ---------------- OIDC Role (assume-only) ----------------
+  # GitHub Actions assumes THIS role via OIDC. It has no deploy permissions of
+  # its own — it may only sts:AssumeRole the two deploy roles below.
+  GitHubOIDCRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub "${AppStackName}-gha-oidc"
+      MaxSessionDuration: 3600
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Federated: !If
+                - ShouldCreateOidc
+                - !Ref GitHubOIDCProvider
+                - !Sub "arn:aws:iam::${AWS::AccountId}:oidc-provider/token.actions.githubusercontent.com"
+            Action: sts:AssumeRoleWithWebIdentity
+            Condition:
+              StringEquals:
+                token.actions.githubusercontent.com:aud: sts.amazonaws.com
+              StringLike:
+                token.actions.githubusercontent.com:sub: !Sub "repo:${GitHubOrg}/${GitHubRepo}:ref:refs/heads/${GitHubBranch}"
+      Policies:
+        - PolicyName: AssumeDeployRolesOnly
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action: sts:AssumeRole
+                Resource:
+                  # Reference by predictable ARN (not !GetAtt) to avoid a circular
+                  # dependency: the deploy roles trust THIS role by !GetAtt.
+                  - !Sub "arn:aws:iam::${AWS::AccountId}:role/${AppStackName}-deploy-backend"
+                  - !Sub "arn:aws:iam::${AWS::AccountId}:role/${AppStackName}-deploy-frontend"
+
+  # ---------------- CloudFormation Service Role ----------------
+  # CloudFormation assumes THIS role to actually create/update/delete the app
+  # stack's resources. The deploy role only hands this role to CloudFormation.
+  CfnServiceRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub "${AppStackName}-cfn-service"
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: cloudformation.amazonaws.com
+            Action: sts:AssumeRole
+      Policies:
+        - PolicyName: AppResourceProvisioning
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              # application runtime resources
+              - Sid: AppResources
+                Effect: Allow
+                Action:
+                  - lambda:*
+                  - apigateway:*
+                  - dynamodb:*
+                  - cloudfront:*
+                  - s3:*
+                  - logs:*
+                  - events:*
+                  - ssm:GetParameters
+                  - ssm:GetParameter
+                Resource: '*'
+              # IAM execution roles the app stack creates (scoped by name prefix)
+              - Sid: IamForAppRoles
+                Effect: Allow
+                Action:
+                  - iam:CreateRole
+                  - iam:DeleteRole
+                  - iam:GetRole
+                  - iam:PassRole
+                  - iam:AttachRolePolicy
+                  - iam:DetachRolePolicy
+                  - iam:PutRolePolicy
+                  - iam:DeleteRolePolicy
+                  - iam:GetRolePolicy
+                  - iam:TagRole
+                  - iam:UntagRole
+                  - iam:CreatePolicy
+                  - iam:DeletePolicy
+                  - iam:ListPolicyVersions
+                  - iam:CreatePolicyVersion
+                  - iam:DeletePolicyVersion
+                Resource:
+                  - !Sub "arn:aws:iam::${AWS::AccountId}:role/${AppStackName}-*"
+                  - !Sub "arn:aws:iam::${AWS::AccountId}:policy/${AppStackName}-*"
+
+  # ---------------- Backend Deploy Role (thin: drives CloudFormation only) ----------------
+  # The pipeline assumes THIS role. It can operate CloudFormation and hand the
+  # service role to it, plus write to the SAM packaging bucket — nothing else.
+  BackendDeployRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub "${AppStackName}-deploy-backend"
+      MaxSessionDuration: 3600
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              AWS: !GetAtt GitHubOIDCRole.Arn   # only the OIDC role may assume this
+            Action: sts:AssumeRole
+      Policies:
+        - PolicyName: DriveCloudFormation
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              # operate CloudFormation (SAM uses change sets under the hood)
+              - Sid: CloudFormation
+                Effect: Allow
+                Action:
+                  - cloudformation:CreateChangeSet
+                  - cloudformation:ExecuteChangeSet
+                  - cloudformation:DescribeChangeSet
+                  - cloudformation:DeleteChangeSet
+                  - cloudformation:CreateStack
+                  - cloudformation:UpdateStack
+                  - cloudformation:DeleteStack
+                  - cloudformation:DescribeStacks
+                  - cloudformation:DescribeStackEvents
+                  - cloudformation:DescribeStackResources
+                  - cloudformation:GetTemplate
+                  - cloudformation:GetTemplateSummary
+                  - cloudformation:ListStackResources
+                  - cloudformation:ValidateTemplate
+                Resource: '*'
+              # hand ONLY the service role to CloudFormation
+              - Sid: PassServiceRole
+                Effect: Allow
+                Action: iam:PassRole
+                Resource: !GetAtt CfnServiceRole.Arn
+                Condition:
+                  StringEquals:
+                    iam:PassedToService: cloudformation.amazonaws.com
+              # SAM packaging artifacts bucket (sam deploy --resolve-s3)
+              - Sid: SamPackagingBucket
+                Effect: Allow
+                Action:
+                  - s3:CreateBucket
+                  - s3:GetBucketLocation
+                  - s3:ListBucket
+                  - s3:GetObject
+                  - s3:PutObject
+                  - s3:GetBucketPolicy
+                  - s3:PutBucketPolicy
+                  - s3:PutEncryptionConfiguration
+                  - s3:PutBucketVersioning
+                  - s3:PutBucketPublicAccessBlock
+                  - s3:PutBucketTagging
+                Resource:
+                  - "arn:aws:s3:::aws-sam-cli-managed-default*"
+                  - "arn:aws:s3:::aws-sam-cli-managed-default*/*"
+              # read master key param name is not needed at deploy time (passed as name)
+
+
+  # ---------------- Frontend Deploy Role (S3 sync + CloudFront invalidation) ----------------
+  FrontendDeployRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub "${AppStackName}-deploy-frontend"
+      MaxSessionDuration: 3600
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              AWS: !GetAtt GitHubOIDCRole.Arn
+            Action: sts:AssumeRole
+      Policies:
+        - PolicyName: FrontendPublish
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Sid: S3Sync
+                Effect: Allow
+                Action:
+                  - s3:ListBucket
+                  - s3:GetObject
+                  - s3:PutObject
+                  - s3:DeleteObject
+                Resource:
+                  - !Sub "arn:aws:s3:::${AppStackName}-webbucket-*"
+                  - !Sub "arn:aws:s3:::${AppStackName}-webbucket-*/*"
+                  - !Sub "arn:aws:s3:::${AppStackName}-masterwebbucket-*"
+                  - !Sub "arn:aws:s3:::${AppStackName}-masterwebbucket-*/*"
+              - Sid: CloudFrontInvalidation
+                Effect: Allow
+                Action:
+                  - cloudfront:CreateInvalidation
+                  - cloudfront:ListDistributions
+                  - cloudfront:GetDistribution
+                Resource: '*'
+              # read app stack outputs (bucket names, distribution ids)
+              - Sid: ReadStackOutputs
+                Effect: Allow
+                Action:
+                  - cloudformation:DescribeStacks
+                Resource: '*'
+
+Outputs:
+  OIDCRoleArn:
+    Description: Role GitHub Actions assumes via OIDC (set as AWS_OIDC_ROLE_ARN)
+    Value: !GetAtt GitHubOIDCRole.Arn
+  BackendDeployRoleArn:
+    Value: !GetAtt BackendDeployRole.Arn
+  CfnServiceRoleArn:
+    Description: CloudFormation service role (pass to sam deploy --role-arn)
+    Value: !GetAtt CfnServiceRole.Arn
+  FrontendDeployRoleArn:
+    Value: !GetAtt FrontendDeployRole.Arn
