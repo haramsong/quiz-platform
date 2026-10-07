@@ -1,62 +1,65 @@
-// Print-only answer sheet. Shown only when printing (@media print) or when
-// `active` is true (we toggle a body class and call window.print()).
+// Print-only answer sheet — one question per landscape page, host-styled.
 export default function PrintView({ title, questions }) {
   return (
     <div className="print-view" aria-hidden="true">
-      <div className="print-header">
-        <h1>{title || '퀴즈'} — 정답지</h1>
-        <p className="print-meta">총 {questions.length}문제</p>
-      </div>
+      {/* cover page */}
+      <section className="print-page print-cover">
+        <div className="print-brand">🎯 Quiz Platform</div>
+        <h1 className="print-cover-title">{title || '퀴즈'}</h1>
+        <div className="print-cover-sub">정답지 · 총 {questions.length}문제</div>
+      </section>
 
       {questions.map((q) => {
         const correctIds = q.correctChoiceIds || [];
+        const typeLabel = q.type === 'SINGLE' ? '객관식 · 단일 선택'
+          : q.type === 'MULTI' ? '객관식 · 복수 선택' : '주관식';
         return (
-          <div className="print-q" key={q.order}>
-            <div className="print-q-head">
-              <span className="print-q-num">Q{q.order}</span>
-              <span className="print-q-type">
-                {q.type === 'SINGLE' ? '객관식(단일)' : q.type === 'MULTI' ? '객관식(복수)' : '주관식'}
-              </span>
-              <span className="print-q-points">{q.points || 1}점</span>
-            </div>
-
-            <div className="print-q-body">{q.body}</div>
-
-            {q.imageUrl && (
-              <div className="print-q-image">
-                <img src={q.imageUrl} alt="" crossOrigin="anonymous" />
+          <section className="print-page" key={q.order}>
+            <div className="print-card">
+              <div className="print-card-head">
+                <span className="print-badge">Q{q.order}</span>
+                <span className="print-type">{typeLabel}</span>
+                <span className="print-points">{q.points || 1}점</span>
               </div>
-            )}
 
-            {(q.type === 'SINGLE' || q.type === 'MULTI') && (
-              <ul className="print-choices">
-                {(q.choices || []).map((c) => {
-                  const isCorrect = correctIds.includes(c.id);
-                  return (
-                    <li key={c.id} className={`print-choice ${isCorrect ? 'correct' : ''}`}>
-                      <span className="print-check">{isCorrect ? '☑' : '☐'}</span>
-                      <span className="print-choice-text">{c.text}</span>
-                    </li>
-                  );
-                })}
-              </ul>
-            )}
+              <h2 className="print-body">{q.body}</h2>
 
-            {q.type === 'TEXT' && (
-              <div className="print-text-answer">
-                <div className="print-answer-line">
-                  <span className="print-answer-label">정답</span>
-                  <span className="print-answer-value">{q.correctText || '-'}</span>
+              {q.imageUrl && (
+                <div className="print-image"><img src={q.imageUrl} alt="" crossOrigin="anonymous" /></div>
+              )}
+
+              {(q.type === 'SINGLE' || q.type === 'MULTI') && (
+                <div className="print-choices">
+                  {(q.choices || []).map((c) => {
+                    const ok = correctIds.includes(c.id);
+                    return (
+                      <div key={c.id} className={`print-choice ${ok ? 'correct' : ''}`}>
+                        <span className="print-mark">{ok ? '✓' : ''}</span>
+                        <span className="print-choice-text">{c.text}</span>
+                      </div>
+                    );
+                  })}
                 </div>
-                {(q.acceptedAnswers || []).filter(Boolean).length > 0 && (
-                  <div className="print-answer-line">
-                    <span className="print-answer-label">유사 정답</span>
-                    <span className="print-accepted">{(q.acceptedAnswers || []).filter(Boolean).join(', ')}</span>
+              )}
+
+              {q.type === 'TEXT' && (
+                <div className="print-text">
+                  <div className="print-answer-row">
+                    <span className="print-answer-tag">정답</span>
+                    <span className="print-answer-val">{q.correctText || '-'}</span>
                   </div>
-                )}
-              </div>
-            )}
-          </div>
+                  {(q.acceptedAnswers || []).filter(Boolean).length > 0 && (
+                    <div className="print-answer-row accepted">
+                      <span className="print-answer-tag">유사 정답</span>
+                      <span className="print-accepted">{(q.acceptedAnswers || []).filter(Boolean).join(', ')}</span>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              <div className="print-foot">{title || '퀴즈'} — 정답지</div>
+            </div>
+          </section>
         );
       })}
     </div>
