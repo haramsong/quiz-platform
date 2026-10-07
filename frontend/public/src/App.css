@@ -302,3 +302,13 @@ h1, h2, .player-q-body, .choice-line, .host-choice .text, .big-count,
 
 /* keep the corner "뒤로/로비" button clear of centered lobby content */
 .host-present.center { padding-top: 3.5rem; }
+
+
+/* ===== Past result modal (setup) ===== */
+.result-modal { width: min(480px, 92vw); }
+.result-list { display: flex; flex-direction: column; gap: .4rem; margin: 1rem 0; max-height: 50vh; overflow-y: auto; }
+.result-row { display: flex; align-items: center; gap: .6rem; padding: .5rem .7rem; background: #0f172a; border-radius: 8px; font-size: .9rem; }
+.result-row.winner { background: #422006; }
+.result-row .rank { font-weight: 800; width: 2.2rem; }
+.result-row .name { flex: 1; }
+.result-row .pts { color: var(--muted); }

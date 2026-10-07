@@ -246,15 +246,14 @@ export default function HostApp({ initialCode }) {
       </div>
       <p className="big-count">{playerCount}명 참여</p>
       <p className="muted">QR을 스캔하거나 링크로 입장하세요.</p>
-      {sessionInfo?.hasResult && (
-        <p className="prior-note">⚠️ 이전 게임 결과가 저장되어 있습니다. 시작 시 초기화됩니다.</p>
-      )}
-      <button className="btn primary big" onClick={doStart} disabled={busy}>🚀 퀴즈 시작</button>
-      <div className="lobby-subactions">
-        {sessionInfo?.hasResult && (
-          <button className="btn ghost" onClick={viewPastResult}>📊 지난 결과 보기</button>
-        )}
-      </div>
+      {(() => {
+        const hasPrior = (sessionInfo?.playerCount || 0) > 0 || sessionInfo?.hasResult || (sessionInfo?.state && sessionInfo.state !== 'WAITING');
+        return (
+          <button className="btn primary big" onClick={doStart} disabled={busy}>
+            {hasPrior ? '🔄 게임 재시작' : '🚀 진행 시작'}
+          </button>
+        );
+      })()}
       <JoinToastContainer toasts={toasts} />
     </div>
   );
@@ -287,7 +286,7 @@ export default function HostApp({ initialCode }) {
       <div className="host-present">
         <button className="btn ghost tiny corner-lobby" onClick={backToLobby}>← 로비</button>
         <div className="top-bar">
-          <span className="q-num">Q{q.order}/{q.total}</span>
+          <span className="q-num">Q {q.order} / {q.total}</span>
           <span className="points-badge big">{q.points || 1}점</span>
           <span className="progress">응답 {answered}/{playerCount}</span>
         </div>

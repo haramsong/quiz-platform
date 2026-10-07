@@ -11,7 +11,13 @@ async function apiCall(path, code, pin, { method = 'GET', body } = {}) {
     method, headers: { 'content-type': 'application/json', 'x-host-auth': `${code}:${pin}` },
     body: body ? JSON.stringify(body) : undefined,
   });
-  return res.json();
+  const data = await res.json().catch(() => null);
+  if (!res.ok) {
+    throw Object.assign(new Error(data?.error?.message || res.statusText), {
+      code: data?.error?.code, status: res.status,
+    });
+  }
+  return data;
 }
 
 export default function SetupPage({ code, pin, quizData, onRefresh, onStartQuiz, onResetGame, resetting }) {
@@ -26,6 +32,7 @@ export default function SetupPage({ code, pin, quizData, onRefresh, onStartQuiz,
   const [selIdx, setSelIdx] = useState(-1);
   const [saving, setSaving] = useState(false);
   const [msg, setMsg] = useState('');
+  const [pastResult, setPastResult] = useState(null); // modal data
   const initedRef = useRef(false);
 
   // Initialize from server data only once (avoid clobbering unsaved local edits).
@@ -48,13 +55,14 @@ export default function SetupPage({ code, pin, quizData, onRefresh, onStartQuiz,
     setTimeout(() => setMsg(''), 2000);
   };
 
-  // Save everything at once: quiz settings + every question.
+  // Save settings (always) + only changed questions (_new or _dirty).
   const saveAll = async () => {
     setSaving(true); setMsg('저장 중…');
     try {
+      // settings are lightweight — always save
       await apiCall('/quizzes', code, pin, { method: 'POST', body: { code, title, timeoutSec: timeout, prizeWinners, thumbnailKey } });
-      const snapshot = questions;
-      for (const q of snapshot) {
+      const changed = questions.filter((q) => q._new || q._dirty);
+      for (const q of changed) {
         const body = { ...q }; delete body._new; delete body._dirty; delete body.imageUrl;
         if (q._new) {
           await apiCall(`/quizzes/${code}/questions`, code, pin, { method: 'POST', body });
@@ -62,16 +70,27 @@ export default function SetupPage({ code, pin, quizData, onRefresh, onStartQuiz,
           await apiCall(`/quizzes/${code}/questions/${q.order}`, code, pin, { method: 'PUT', body });
         }
       }
-      // clear _new / _dirty flags locally (all saved)
+      // clear _new / _dirty flags locally
       setQuestions((prev) => prev.map((q) => ({ ...q, _new: false, _dirty: false })));
-      setMsg(`전체 저장 완료 (${snapshot.length}문제)`);
-      toast.show(`전체 저장 완료 (${snapshot.length}문제)`, { type: 'success' });
+      const n = changed.length;
+      const label = n === 0 ? '설정 저장 완료' : `저장 완료 (문제 ${n}개 변경)`;
+      setMsg(label);
+      toast.show(label, { type: 'success' });
     } catch {
       setMsg('저장 실패 — 다시 시도하세요');
       toast.show('저장에 실패했어요', { type: 'error' });
     } finally {
       setSaving(false);
       setTimeout(() => setMsg(''), 2500);
+    }
+  };
+
+  const viewPastResult = async () => {
+    try {
+      const r = await apiCall(`/quizzes/${code}/result`, code, pin);
+      setPastResult(r);
+    } catch (ex) {
+      toast.show(ex.code === 'NO_RESULT' ? '저장된 지난 기록이 없어요' : '기록 조회 실패', { type: 'error' });
     }
   };
 
@@ -161,11 +180,9 @@ export default function SetupPage({ code, pin, quizData, onRefresh, onStartQuiz,
         <h2>📝 퀴즈 세팅 — <code>{code}</code></h2>
         <div className="setup-actions">
           {msg && <span className="msg">{msg}</span>}
-          {onResetGame && (
-            <button className="btn ghost" onClick={onResetGame} disabled={resetting} title="참가자·점수·지난 결과 삭제 (문제는 유지)">
-              ♻️ 게임 초기화
-            </button>
-          )}
+          <button className="btn ghost" onClick={viewPastResult} title="마지막으로 끝낸 게임 결과 보기">
+            📊 지난 기록
+          </button>
           <button className="btn save-all" onClick={saveAll} disabled={saving}>
             💾 전체 저장
           </button>
@@ -224,6 +241,30 @@ export default function SetupPage({ code, pin, quizData, onRefresh, onStartQuiz,
           )}
         </main>
       </div>
+
+      {pastResult && (
+        <div className="confirm-backdrop" onClick={() => setPastResult(null)}>
+          <div className="confirm-box result-modal" onClick={(e) => e.stopPropagation()}>
+            <h3 className="confirm-title">📊 지난 게임 기록</h3>
+            {pastResult.endedAt && (
+              <p className="muted small">{new Date(pastResult.endedAt).toLocaleString('ko-KR')} 종료</p>
+            )}
+            <div className="result-list">
+              {(pastResult.ranking || []).map((r, i) => (
+                <div key={i} className={`result-row ${r.isWinner ? 'winner' : ''}`}>
+                  <span className="rank">#{r.rank}</span>
+                  <span className="name">{r.nickname}</span>
+                  <span className="pts">{r.totalScore}점 ({r.totalTimeSec}s)</span>
+                  {r.isWinner && <span>{r.winReason === 'FIRST' ? '🥇' : '🎁'}</span>}
+                </div>
+              ))}
+            </div>
+            <div className="confirm-actions">
+              <button className="btn primary" onClick={() => setPastResult(null)}>닫기</button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

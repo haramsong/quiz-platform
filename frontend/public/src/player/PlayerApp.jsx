@@ -125,7 +125,7 @@ export default function PlayerApp({ initialCode }) {
       <div className="player-answer">
         <div className="top-bar">
           <div className="top-left">
-            <span className="q-num">Q{q.order}/{q.total}</span>
+            <span className="q-num">Q {q.order} / {q.total}</span>
             <span className="points-badge">{q.points || 1}점</span>
           </div>
           <span className="submitted-badge" style={{ visibility: submitted ? 'visible' : 'hidden' }}>✅ 제출 완료</span>
