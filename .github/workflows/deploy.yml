@@ -66,6 +66,7 @@ jobs:
         with:
           role-to-assume: ${{ secrets.AWS_BACKEND_DEPLOY_ROLE_ARN }}
           role-chaining: true
+          role-skip-session-tagging: true
           aws-region: ${{ env.AWS_REGION }}
 
       - name: SAM build & deploy
@@ -101,6 +102,7 @@ jobs:
         with:
           role-to-assume: ${{ secrets.AWS_FRONTEND_DEPLOY_ROLE_ARN }}
           role-chaining: true
+          role-skip-session-tagging: true
           aws-region: ${{ env.AWS_REGION }}
 
       - name: Build & deploy public console
@@ -135,6 +137,7 @@ jobs:
         with:
           role-to-assume: ${{ secrets.AWS_FRONTEND_DEPLOY_ROLE_ARN }}
           role-chaining: true
+          role-skip-session-tagging: true
           aws-region: ${{ env.AWS_REGION }}
 
       - name: Build & deploy master console
