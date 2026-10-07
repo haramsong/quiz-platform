@@ -56,7 +56,7 @@ export default function SetupPage({ code, pin, quizData, onRefresh, onStartQuiz,
     setTimeout(() => setMsg(''), 2000);
   };
 
-  // Save settings (always) + only changed questions (_new or _dirty).
+  // Save settings (always) + only changed questions (_new or _dirty). Returns true on success.
   const saveAll = async () => {
     setSaving(true); setMsg('저장 중…');
     try {
@@ -77,13 +77,72 @@ export default function SetupPage({ code, pin, quizData, onRefresh, onStartQuiz,
       const label = n === 0 ? '설정 저장 완료' : `저장 완료 (문제 ${n}개 변경)`;
       setMsg(label);
       toast.show(label, { type: 'success' });
+      return true;
     } catch {
       setMsg('저장 실패 — 다시 시도하세요');
       toast.show('저장에 실패했어요', { type: 'error' });
+      return false;
     } finally {
       setSaving(false);
       setTimeout(() => setMsg(''), 2500);
     }
+  };
+
+  // unsaved changes = any new/dirty question
+  const isDirty = questions.some((q) => q._new || q._dirty);
+
+  // Warn on refresh / tab close while there are unsaved changes.
+  useEffect(() => {
+    const onBeforeUnload = (e) => {
+      if (!isDirty) return;
+      e.preventDefault();
+      e.returnValue = ''; // required for the native prompt
+      return '';
+    };
+    window.addEventListener('beforeunload', onBeforeUnload);
+    return () => window.removeEventListener('beforeunload', onBeforeUnload);
+  }, [isDirty]);
+
+  // Guard the browser back button while there are unsaved changes.
+  const dirtyRef = useRef(isDirty);
+  dirtyRef.current = isDirty;
+  useEffect(() => {
+    // push a sentinel state so the first "back" fires popstate here
+    window.history.pushState({ qpGuard: true }, '');
+    const onPop = async () => {
+      if (!dirtyRef.current) return; // nothing to protect → allow
+      // re-push to cancel this back for now while we ask
+      window.history.pushState({ qpGuard: true }, '');
+      const ok = await confirm.ask({
+        title: '저장하지 않은 항목이 있습니다',
+        message: '저장하고 나가시겠습니까?\n취소하면 현재 화면에 머뭅니다.',
+        confirmText: '저장 후 나가기',
+        cancelText: '머무르기',
+      });
+      if (ok) {
+        await saveAll();
+        window.history.back(); // proceed with navigation
+      }
+    };
+    window.addEventListener('popstate', onPop);
+    return () => window.removeEventListener('popstate', onPop);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Start the game; if there are unsaved changes, offer to save first.
+  const handleStart = async () => {
+    if (isDirty) {
+      const ok = await confirm.ask({
+        title: '저장하지 않은 항목이 있습니다',
+        message: '저장하고 진행하시겠습니까?',
+        confirmText: '저장 후 진행',
+        cancelText: '취소',
+      });
+      if (!ok) return;
+      const saved = await saveAll();
+      if (!saved) return; // save failed → stay
+    }
+    onStartQuiz();
   };
 
   const viewPastResult = async () => {
@@ -196,7 +255,7 @@ export default function SetupPage({ code, pin, quizData, onRefresh, onStartQuiz,
           <button className="btn save-all" onClick={saveAll} disabled={saving}>
             💾 전체 저장
           </button>
-          <button className="btn primary" onClick={onStartQuiz} disabled={questions.length === 0}>
+          <button className="btn primary" onClick={handleStart} disabled={questions.length === 0}>
             🚀 진행 시작 ({questions.length}문제)
           </button>
         </div>
