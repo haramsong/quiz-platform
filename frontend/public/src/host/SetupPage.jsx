@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { toWebp } from '../utils/webp';
 import { uploadImage } from '../utils/upload';
+import { useToast } from '../Toast';
 
 const API = import.meta.env.VITE_API_URL;
 
@@ -13,6 +14,7 @@ async function apiCall(path, code, pin, { method = 'GET', body } = {}) {
 }
 
 export default function SetupPage({ code, pin, quizData, onRefresh, onStartQuiz, onResetGame, resetting }) {
+  const toast = useToast();
   const [title, setTitle] = useState(quizData?.title || '');
   const [timeout, setTimeout_] = useState(quizData?.timeoutSec || 20);
   const [prizeWinners, setPrize] = useState(quizData?.prizeWinners || 1);
@@ -61,8 +63,10 @@ export default function SetupPage({ code, pin, quizData, onRefresh, onStartQuiz,
       // clear _new / _dirty flags locally (all saved)
       setQuestions((prev) => prev.map((q) => ({ ...q, _new: false, _dirty: false })));
       setMsg(`전체 저장 완료 (${snapshot.length}문제)`);
+      toast.show(`전체 저장 완료 (${snapshot.length}문제)`, { type: 'success' });
     } catch {
       setMsg('저장 실패 — 다시 시도하세요');
+      toast.show('저장에 실패했어요', { type: 'error' });
     } finally {
       setSaving(false);
       setTimeout(() => setMsg(''), 2500);

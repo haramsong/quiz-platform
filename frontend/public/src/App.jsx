@@ -1,8 +1,9 @@
 import HostApp from './host/HostApp';
 import PlayerApp from './player/PlayerApp';
+import { ToastProvider } from './Toast';
 import './App.css';
 
-export default function App() {
+function Routed() {
   const path = window.location.pathname;
   const params = new URLSearchParams(window.location.search);
   const code = (params.get('code') || '').toUpperCase();
@@ -19,5 +20,13 @@ export default function App() {
         <a className="btn ghost" href="/host">호스트로 입장 (/host)</a>
       </div>
     </div>
+  );
+}
+
+export default function App() {
+  return (
+    <ToastProvider>
+      <Routed />
+    </ToastProvider>
   );
 }

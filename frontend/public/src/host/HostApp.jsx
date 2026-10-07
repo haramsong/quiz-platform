@@ -5,6 +5,7 @@ import SetupPage from './SetupPage';
 import { JoinToastContainer, createToast } from './JoinToast';
 import PlayQR from './PlayQR';
 import AnswerReveal from '../AnswerReveal';
+import { useToast } from '../Toast';
 
 const Phase = { LOGIN: 'login', SETUP: 'setup', LOBBY: 'lobby', QUESTION: 'question', LB: 'lb', RESULT: 'result', PAST_RESULT: 'past_result' };
 
@@ -20,6 +21,7 @@ export default function HostApp({ initialCode }) {
   const [pin, setPin] = useState(() => loadPin(initialCode || ''));
   const [err, setErr] = useState('');
   const [loading, setLoading] = useState(false);
+  const toast = useToast();
 
   const [quizData, setQuizData] = useState(null);
   const [playerCount, setPcount] = useState(0);
@@ -153,7 +155,7 @@ export default function HostApp({ initialCode }) {
       );
       if (!okReset) return;
       setBusy(true);
-      try { await api.resetGame(code, pin); } catch { /* ignore */ }
+      try { await api.resetGame(code, pin); toast.show('이전 데이터를 초기화했어요', { type: 'success' }); } catch { /* ignore */ }
       setBusy(false);
       setPcount(0);
       setSessionInfo({ state: 'WAITING', playerCount: 0, hasResult: false });
@@ -171,7 +173,10 @@ export default function HostApp({ initialCode }) {
       setPcount(0);
       setSessionInfo({ state: 'WAITING', playerCount: 0, hasResult: false });
       setPastResult(null);
-    } catch { /* ignore */ }
+      toast.show('게임을 초기화했어요', { type: 'success' });
+    } catch {
+      toast.show('초기화에 실패했어요', { type: 'error' });
+    }
     setBusy(false);
   };
 
@@ -184,6 +189,7 @@ export default function HostApp({ initialCode }) {
     setSessionInfo({ state: 'WAITING', playerCount: 0, hasResult: false });
     setQuestion(null); setLb(null); setResult(null);
     setPhase(Phase.LOBBY);
+    toast.show('로비로 돌아왔어요', { type: 'success' });
   };
 
   const viewPastResult = async () => {
