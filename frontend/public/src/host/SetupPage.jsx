@@ -3,6 +3,7 @@ import { toWebp } from '../utils/webp';
 import { uploadImage } from '../utils/upload';
 import { useToast } from '../Toast';
 import { useConfirm } from '../Confirm';
+import PrintView from './PrintView';
 
 const API = import.meta.env.VITE_API_URL;
 
@@ -94,6 +95,11 @@ export default function SetupPage({ code, pin, quizData, onRefresh, onStartQuiz,
     }
   };
 
+  const doPrint = () => {
+    if (questions.length === 0) { toast.show('인쇄할 문제가 없어요', { type: 'error' }); return; }
+    window.print();
+  };
+
   const addQuestion = () => {
     const maxOrder = questions.reduce((m, q) => Math.max(m, q.order || 0), 0);
     const order = maxOrder + 1;
@@ -176,12 +182,16 @@ export default function SetupPage({ code, pin, quizData, onRefresh, onStartQuiz,
 
   return (
     <div className="setup">
+      <PrintView title={title} questions={questions} />
       <header className="setup-header">
         <h2>📝 퀴즈 세팅 — <code>{code}</code></h2>
         <div className="setup-actions">
           {msg && <span className="msg">{msg}</span>}
           <button className="btn ghost" onClick={viewPastResult} title="마지막으로 끝낸 게임 결과 보기">
             📊 지난 기록
+          </button>
+          <button className="btn ghost" onClick={doPrint} title="문제·정답을 인쇄 / PDF로 저장">
+            🖨️ 인쇄
           </button>
           <button className="btn save-all" onClick={saveAll} disabled={saving}>
             💾 전체 저장

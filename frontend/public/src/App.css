@@ -312,3 +312,48 @@ h1, h2, .player-q-body, .choice-line, .host-choice .text, .big-count,
 .result-row .rank { font-weight: 800; width: 2.2rem; }
 .result-row .name { flex: 1; }
 .result-row .pts { color: var(--muted); }
+
+
+/* ===== Print answer sheet ===== */
+.print-view { display: none; }
+
+@media print {
+  /* hide everything, then reveal only the print sheet subtree */
+  body { background: #fff !important; color: #000 !important; }
+  body * { visibility: hidden !important; }
+  .print-view, .print-view * { visibility: visible !important; }
+  .print-view {
+    display: block !important;
+    position: absolute; left: 0; top: 0; width: 100%;
+    color: #000; font-family: var(--font-body); padding: 0;
+  }
+  .print-header { margin-bottom: 1rem; border-bottom: 2px solid #000; padding-bottom: .5rem; }
+  .print-header h1 { font-size: 20pt; margin: 0; color: #000; }
+  .print-meta { font-size: 10pt; color: #444; margin: .25rem 0 0; }
+
+  .print-q {
+    break-inside: avoid; page-break-inside: avoid;
+    border: 1px solid #999; border-radius: 6px;
+    padding: 12px 14px; margin: 0 0 12px;
+  }
+  .print-q-head { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; }
+  .print-q-num { font-weight: 800; font-size: 13pt; }
+  .print-q-type { font-size: 9pt; color: #555; border: 1px solid #bbb; border-radius: 4px; padding: 1px 6px; }
+  .print-q-points { margin-left: auto; font-size: 10pt; color: #333; }
+  .print-q-body { font-size: 13pt; margin-bottom: 8px; white-space: pre-line; }
+  .print-q-image { margin: 6px 0; }
+  .print-q-image img { max-width: 60%; max-height: 240px; object-fit: contain; border: 1px solid #ddd; }
+
+  .print-choices { list-style: none; padding: 0; margin: 4px 0 0; }
+  .print-choice { display: flex; align-items: center; gap: 8px; padding: 3px 0; font-size: 12pt; }
+  .print-choice .print-check { font-size: 14pt; }
+  .print-choice.correct { font-weight: 700; }
+  .print-choice.correct .print-choice-text { text-decoration: underline; }
+
+  .print-text-answer { margin-top: 4px; }
+  .print-answer-line { display: flex; gap: 10px; font-size: 12pt; padding: 2px 0; }
+  .print-answer-label { font-weight: 700; min-width: 64px; }
+  .print-accepted { color: #333; }
+
+  @page { margin: 14mm; }
+}
