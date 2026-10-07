@@ -1,0 +1,150 @@
+name: Deploy
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      deploy_all:
+        description: Force deploy all components
+        type: boolean
+        default: false
+
+permissions:
+  id-token: write
+  contents: read
+
+env:
+  AWS_REGION: ap-northeast-2
+  APP_STACK: quiz-platform
+  MASTER_KEY_PARAM: /quiz-platform/master-key
+
+concurrency:
+  group: deploy-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  # ---------------- Detect changed paths ----------------
+  changes:
+    runs-on: ubuntu-latest
+    outputs:
+      backend: ${{ steps.filter.outputs.backend }}
+      public: ${{ steps.filter.outputs.public }}
+      master: ${{ steps.filter.outputs.master }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dorny/paths-filter@v3
+        id: filter
+        with:
+          filters: |
+            backend:
+              - 'backend/**'
+            public:
+              - 'frontend/public/**'
+            master:
+              - 'frontend/master/**'
+
+  # ---------------- Backend (SAM via CloudFormation service role) ----------------
+  backend:
+    needs: changes
+    if: ${{ needs.changes.outputs.backend == 'true' || github.event.inputs.deploy_all == 'true' }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 24 }
+      - uses: aws-actions/setup-sam@v2
+        with: { use-installer: true }
+
+      - name: Configure OIDC credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_OIDC_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+      - name: Assume backend deploy role
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_BACKEND_DEPLOY_ROLE_ARN }}
+          role-chaining: true
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: SAM build & deploy
+        working-directory: backend
+        run: |
+          sam build
+          sam deploy \
+            --stack-name "$APP_STACK" \
+            --region "$AWS_REGION" \
+            --resolve-s3 \
+            --no-confirm-changeset \
+            --no-fail-on-empty-changeset \
+            --capabilities CAPABILITY_IAM \
+            --role-arn "${{ secrets.AWS_CFN_SERVICE_ROLE_ARN }}" \
+            --parameter-overrides "MasterKeyParamName=$MASTER_KEY_PARAM WsStageName=prod"
+
+  # ---------------- Frontend: public console ----------------
+  frontend-public:
+    needs: changes
+    if: ${{ needs.changes.outputs.public == 'true' || github.event.inputs.deploy_all == 'true' }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 24 }
+      - name: Configure OIDC credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_OIDC_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+      - name: Assume frontend deploy role
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_FRONTEND_DEPLOY_ROLE_ARN }}
+          role-chaining: true
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Build & deploy public console
+        working-directory: frontend/public
+        run: |
+          get() { aws cloudformation describe-stacks --stack-name "$APP_STACK" --region "$AWS_REGION" \
+            --query "Stacks[0].Outputs[?OutputKey=='$1'].OutputValue" --output text; }
+          echo "VITE_API_URL=$(get HttpApiUrl)" > .env
+          echo "VITE_WS_URL=$(get WsApiUrl)" >> .env
+          npm ci && npm run build
+          BUCKET=$(get WebBucket); CDN=$(get PublicCdnDomain)
+          aws s3 sync dist/ "s3://$BUCKET/" --delete
+          DIST=$(aws cloudfront list-distributions --query "DistributionList.Items[?DomainName=='$CDN'].Id | [0]" --output text)
+          aws cloudfront create-invalidation --distribution-id "$DIST" --paths "/*"
+
+  # ---------------- Frontend: master console ----------------
+  frontend-master:
+    needs: changes
+    if: ${{ needs.changes.outputs.master == 'true' || github.event.inputs.deploy_all == 'true' }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 24 }
+      - name: Configure OIDC credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_OIDC_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+      - name: Assume frontend deploy role
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_FRONTEND_DEPLOY_ROLE_ARN }}
+          role-chaining: true
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Build & deploy master console
+        working-directory: frontend/master
+        run: |
+          get() { aws cloudformation describe-stacks --stack-name "$APP_STACK" --region "$AWS_REGION" \
+            --query "Stacks[0].Outputs[?OutputKey=='$1'].OutputValue" --output text; }
+          echo "VITE_API_URL=$(get HttpApiUrl)" > .env
+          npm ci && npm run build
+          BUCKET=$(get MasterWebBucket); CDN=$(get MasterCdnDomain)
+          aws s3 sync dist/ "s3://$BUCKET/" --delete
+          DIST=$(aws cloudfront list-distributions --query "DistributionList.Items[?DomainName=='$CDN'].Id | [0]" --output text)
+          aws cloudfront create-invalidation --distribution-id "$DIST" --paths "/*"
