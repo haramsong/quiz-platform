@@ -1,7 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { api } from '../api';
 import { connect, send, disconnect } from '../ws';
-import { colorHex } from '../constants';
 import AnswerReveal from '../AnswerReveal';
 
 const Phase = { JOIN: 'join', WAIT: 'wait', ANSWER: 'answer', LEADERBOARD: 'lb', RESULT: 'result' };

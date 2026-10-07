@@ -6,6 +6,7 @@ import { JoinToastContainer, createToast } from './JoinToast';
 import PlayQR from './PlayQR';
 import AnswerReveal from '../AnswerReveal';
 import { useToast } from '../Toast';
+import { useConfirm } from '../Confirm';
 
 const Phase = { LOGIN: 'login', SETUP: 'setup', LOBBY: 'lobby', QUESTION: 'question', LB: 'lb', RESULT: 'result', PAST_RESULT: 'past_result' };
 
@@ -22,6 +23,7 @@ export default function HostApp({ initialCode }) {
   const [err, setErr] = useState('');
   const [loading, setLoading] = useState(false);
   const toast = useToast();
+  const confirm = useConfirm();
 
   const [quizData, setQuizData] = useState(null);
   const [playerCount, setPcount] = useState(0);
@@ -150,9 +152,12 @@ export default function HostApp({ initialCode }) {
     const s = sessionInfo || (await refreshSession());
     const hasPrior = (s?.playerCount || 0) > 0 || s?.hasResult || (s?.state && s.state !== 'WAITING');
     if (hasPrior) {
-      const okReset = window.confirm(
-        '이전 게임 데이터가 있습니다.\n초기화하고 새로 시작할까요?\n(참가자·점수·지난 결과가 삭제됩니다)'
-      );
+      const okReset = await confirm.ask({
+        title: '이전 게임 데이터가 있어요',
+        message: '초기화하고 새로 시작할까요?\n참가자·점수·지난 결과가 삭제됩니다.',
+        confirmText: '초기화 후 시작',
+        danger: true,
+      });
       if (!okReset) return;
       setBusy(true);
       try { await api.resetGame(code, pin); toast.show('이전 데이터를 초기화했어요', { type: 'success' }); } catch { /* ignore */ }
@@ -166,7 +171,13 @@ export default function HostApp({ initialCode }) {
   const doNext = () => send({ action: 'next' });
 
   const resetGame = async () => {
-    if (!window.confirm('게임을 초기화할까요?\n참가자·점수·지난 결과가 삭제됩니다. (문제는 유지)')) return;
+    const ok = await confirm.ask({
+      title: '게임 초기화',
+      message: '참가자·점수·지난 결과가 삭제됩니다.\n(문제는 유지)',
+      confirmText: '초기화',
+      danger: true,
+    });
+    if (!ok) return;
     setBusy(true);
     try {
       await api.resetGame(code, pin);
@@ -182,7 +193,13 @@ export default function HostApp({ initialCode }) {
 
   // Stop the current game and return to the lobby (resets so a clean restart works).
   const backToLobby = async () => {
-    if (!window.confirm('진행을 중단하고 로비로 돌아갈까요?\n현재 게임이 초기화됩니다.')) return;
+    const ok = await confirm.ask({
+      title: '진행 중단',
+      message: '로비로 돌아갈까요?\n현재 게임이 초기화됩니다.',
+      confirmText: '로비로',
+      danger: true,
+    });
+    if (!ok) return;
     clearInterval(timerRef.current);
     try { await api.resetGame(code, pin); } catch { /* ignore */ }
     setPcount(0);
@@ -198,7 +215,7 @@ export default function HostApp({ initialCode }) {
       setPastResult(r);
       setPhase(Phase.PAST_RESULT);
     } catch (ex) {
-      alert(ex.code === 'NO_RESULT' ? '저장된 지난 결과가 없습니다.' : '결과 조회 실패');
+      toast.show(ex.code === 'NO_RESULT' ? '저장된 지난 결과가 없어요' : '결과 조회 실패', { type: 'error' });
     }
   };
 
@@ -221,6 +238,7 @@ export default function HostApp({ initialCode }) {
 
   if (phase === Phase.LOBBY) return (
     <div className="host-present center">
+      <button className="btn ghost tiny corner-lobby" onClick={() => setPhase(Phase.SETUP)}>← 뒤로</button>
       <h1 className="lobby-title">{quizData?.title || code}</h1>
       <div className="lobby-join-row">
         {quizData?.thumbnailUrl && <img src={quizData.thumbnailUrl} alt="" className="lobby-thumb" />}

@@ -1,6 +1,7 @@
 import HostApp from './host/HostApp';
 import PlayerApp from './player/PlayerApp';
 import { ToastProvider } from './Toast';
+import { ConfirmProvider } from './Confirm';
 import './App.css';
 
 function Routed() {
@@ -26,7 +27,9 @@ function Routed() {
 export default function App() {
   return (
     <ToastProvider>
-      <Routed />
+      <ConfirmProvider>
+        <Routed />
+      </ConfirmProvider>
     </ToastProvider>
   );
 }

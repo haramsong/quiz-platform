@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { toWebp } from '../utils/webp';
 import { uploadImage } from '../utils/upload';
 import { useToast } from '../Toast';
+import { useConfirm } from '../Confirm';
 
 const API = import.meta.env.VITE_API_URL;
 
@@ -15,6 +16,7 @@ async function apiCall(path, code, pin, { method = 'GET', body } = {}) {
 
 export default function SetupPage({ code, pin, quizData, onRefresh, onStartQuiz, onResetGame, resetting }) {
   const toast = useToast();
+  const confirm = useConfirm();
   const [title, setTitle] = useState(quizData?.title || '');
   const [timeout, setTimeout_] = useState(quizData?.timeoutSec || 20);
   const [prizeWinners, setPrize] = useState(quizData?.prizeWinners || 1);
@@ -111,14 +113,19 @@ export default function SetupPage({ code, pin, quizData, onRefresh, onStartQuiz,
 
   const deleteQ = async (idx) => {
     const q = questions[idx];
-    if (!confirm(`Q${q.order} 삭제?`)) return;
+    const ok = await confirm.ask({
+      title: `Q${q.order} 삭제`,
+      message: '이 문제를 삭제할까요?',
+      confirmText: '삭제',
+      danger: true,
+    });
+    if (!ok) return;
     if (!q._new) {
       await apiCall(`/quizzes/${code}/questions/${q.order}`, code, pin, { method: 'DELETE' });
     }
     setQuestions((prev) => prev.filter((_, i) => i !== idx));
     setSelIdx(-1);
-    setMsg(`Q${q.order} 삭제됨`);
-    setTimeout(() => setMsg(''), 2000);
+    toast.show(`Q${q.order} 삭제됨`, { type: 'success' });
   };
 
   const handleThumb = async (e) => {
