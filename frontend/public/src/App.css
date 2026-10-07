@@ -3,7 +3,7 @@
   --text: #e2e8f0; --muted: #94a3b8;
   --primary: #7c3aed; --danger: #e11d48;
   --font-body: 'Pretendard', system-ui, -apple-system, 'Apple SD Gothic Neo', 'Malgun Gothic', sans-serif;
-  --font-display: 'Jua', var(--font-body);
+  --font-display: 'Gowun Dodum', var(--font-body);
 }
 * { box-sizing: border-box; }
 body { margin: 0; font-family: var(--font-body); background: var(--bg); color: var(--text); }
