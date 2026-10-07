@@ -143,6 +143,7 @@ export default function HostApp({ initialCode }) {
 
   const goLobby = async () => {
     connect({ code, role: 'host' }, handleWs);
+    await refreshQuiz();      // ensure lobby shows the latest title/thumbnail
     await refreshSession();
     setPhase(Phase.LOBBY);
   };
@@ -191,22 +192,14 @@ export default function HostApp({ initialCode }) {
     setBusy(false);
   };
 
-  // Stop the current game and return to the lobby (resets so a clean restart works).
+  // Return to the lobby WITHOUT deleting anything (quiz, questions, players stay).
+  // The live view just stops; a later "재시작" is what performs a reset.
   const backToLobby = async () => {
-    const ok = await confirm.ask({
-      title: '진행 중단',
-      message: '로비로 돌아갈까요?\n현재 게임이 초기화됩니다.',
-      confirmText: '로비로',
-      danger: true,
-    });
-    if (!ok) return;
     clearInterval(timerRef.current);
-    try { await api.resetGame(code, pin); } catch { /* ignore */ }
-    setPcount(0);
-    setSessionInfo({ state: 'WAITING', playerCount: 0, hasResult: false });
     setQuestion(null); setLb(null); setResult(null);
+    await refreshQuiz();      // reload title/thumbnail/questions so nothing looks "gone"
+    await refreshSession();   // refresh player count / state / hasResult
     setPhase(Phase.LOBBY);
-    toast.show('로비로 돌아왔어요', { type: 'success' });
   };
 
   const viewPastResult = async () => {
