@@ -79,7 +79,7 @@ async function pushQuestion(code, order) {
       { expiresIn: 3600 }).catch(() => null);
   }
 
-  const timeoutSec = q.timeoutSec || meta?.timeoutSec || 10;
+  const timeoutSec = q.timeoutSec || 10;
   await broadcast(code, {
     type: 'question_pushed_host',
     order, total, qType: q.type, body: q.body, imageUrl, points: q.points || 1,
@@ -118,13 +118,12 @@ async function answer(code, ptr, msg) {
   if (existing) return ok();
 
   const q = await loadQuestion(code, order);
-  const meta = await getItem(PK(code), SK.quiz());
   const isCorrect = judge(q, msg.submitted);
   const { elapsedMs, serverElapsedMs } = resolveElapsedMs({
     clientElapsedMs: msg.clientElapsedMs,
     questionStartedAt: session.questionStartedAt,
     recvAt: Date.now(),
-    timeoutSec: q?.timeoutSec || meta?.timeoutSec || 10,
+    timeoutSec: q?.timeoutSec || 10,
   });
   const points = isCorrect ? (q.points || 1) : 0;
 
