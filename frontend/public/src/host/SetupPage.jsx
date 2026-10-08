@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { toWebp } from '../utils/webp';
 import { uploadImage } from '../utils/upload';
+import { downloadXlsx, parseXlsx } from '../utils/excel';
 import { useToast } from '../Toast';
 import { useConfirm } from '../Confirm';
 import PrintView from './PrintView';
@@ -174,6 +175,30 @@ export default function SetupPage({ code, pin, quizData, onRefresh, onStartQuiz,
     setSelIdx(questions.length);
   };
 
+  const exportExcel = () => {
+    if (questions.length === 0) { toast.show('내보낼 문제가 없어요', { type: 'error' }); return; }
+    downloadXlsx(questions, `${(title || code)}-문제.xlsx`);
+  };
+
+  const importExcel = async (e) => {
+    const file = e.target.files?.[0];
+    e.target.value = ''; // allow re-selecting the same file
+    if (!file) return;
+    try {
+      const parsed = await parseXlsx(file);
+      if (parsed.length === 0) { toast.show('가져올 문제가 없어요 (형식 확인)', { type: 'error' }); return; }
+      // append: continue order numbers, mark as new/dirty so 전체 저장이 반영
+      setQuestions((prev) => {
+        let maxOrder = prev.reduce((m, q) => Math.max(m, q.order || 0), 0);
+        const appended = parsed.map((q) => ({ ...q, order: ++maxOrder, _new: true, _dirty: true }));
+        return [...prev, ...appended];
+      });
+      toast.show(`${parsed.length}문제를 가져왔어요 (저장을 눌러 반영)`, { type: 'success' });
+    } catch {
+      toast.show('엑셀을 읽지 못했어요', { type: 'error' });
+    }
+  };
+
   const updateQ = (idx, patch) => {
     setQuestions((prev) => {
       const copy = [...prev];
@@ -285,7 +310,17 @@ export default function SetupPage({ code, pin, quizData, onRefresh, onStartQuiz,
           </div>
 
           <div className="setup-panel">
-            <div className="panel-head"><h3>문제 목록</h3><button className="btn tiny primary" onClick={addQuestion}>+ 추가</button></div>
+            <div className="panel-head">
+              <h3>문제 목록</h3>
+              <div className="q-list-actions">
+                <label className="btn tiny ghost" title="엑셀(.xlsx)에서 문제 가져오기 (추가)">
+                  ⬆︎ 가져오기
+                  <input type="file" accept=".xlsx,.xls" onChange={importExcel} hidden />
+                </label>
+                <button className="btn tiny ghost" onClick={exportExcel} title="현재 문제를 엑셀로 내보내기">⬇︎ 내보내기</button>
+                <button className="btn tiny primary" onClick={addQuestion}>+ 추가</button>
+              </div>
+            </div>
             <div className="q-list">
               {questions.map((q, i) => (
                 <div key={i} className={`q-item ${i === selIdx ? 'sel' : ''} ${(q._dirty || q._new) ? 'dirty' : ''}`} onClick={() => setSelIdx(i)}>

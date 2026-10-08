@@ -464,3 +464,8 @@ h1, h2, .player-q-body, .choice-line, .host-choice .text, .big-count,
 .print-mode-options { display: flex; flex-direction: column; gap: .6rem; margin: 1rem 0; }
 .print-mode-btn { display: flex; flex-direction: column; align-items: flex-start; gap: .2rem; text-align: left; padding: .85rem 1rem; font-size: 1.05rem; }
 .print-mode-sub { font-size: .8rem; color: var(--muted); }
+
+
+/* ===== Question list actions (excel import/export + add) ===== */
+.q-list-actions { display: flex; gap: .35rem; align-items: center; flex-wrap: wrap; }
+.q-list-actions .btn.tiny { padding: .3rem .55rem; }
