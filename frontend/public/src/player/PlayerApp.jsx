@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { api } from '../api';
-import { connect, send, disconnect } from '../ws';
+import { connect, send, disconnect, stopPing } from '../ws';
 import AnswerReveal from '../AnswerReveal';
 
 const Phase = { JOIN: 'join', WAIT: 'wait', ANSWER: 'answer', LEADERBOARD: 'lb', RESULT: 'result' };
@@ -61,6 +61,7 @@ export default function PlayerApp({ initialCode }) {
       clearInterval(timerRef.current);
       setResult(data);
       setPhase(Phase.RESULT);
+      stopPing(); // game over → stop keep-alive so the connection idles out
     }
   }, [startTimer]);
 
