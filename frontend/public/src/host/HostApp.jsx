@@ -143,14 +143,6 @@ export default function HostApp({ initialCode }) {
   }, [code, pin]);
 
   const goLobby = async () => {
-    connect({ code, role: 'host' }, handleWs);
-    await refreshQuiz();      // ensure lobby shows the latest title/thumbnail
-    await refreshSession();
-    setPhase(Phase.LOBBY);
-  };
-
-  const doStart = async () => {
-    // "prior game" = finished result or mid-run session (NOT just connected players)
     const s = sessionInfo || (await refreshSession());
     const hasPrior = !!(s?.hasPrior ?? (s?.hasResult || (s?.state && s.state !== 'WAITING')));
     if (hasPrior) {
@@ -167,8 +159,16 @@ export default function HostApp({ initialCode }) {
       setPcount(0);
       setSessionInfo({ state: 'WAITING', playerCount: 0, hasResult: false });
     }
-    send({ action: 'start' });
+
+    connect({ code, role: 'host' }, handleWs);
+    await refreshQuiz();      // ensure lobby shows the latest title/thumbnail
+    await refreshSession();
+    setPhase(Phase.LOBBY);
   };
+
+  // Lobby start button: just starts the game. Any reset (for a prior game) is
+  // already handled when entering the lobby from setup (goLobby).
+  const doStart = () => send({ action: 'start' });
 
   const doNext = () => send({ action: 'next' });
 
@@ -240,14 +240,7 @@ export default function HostApp({ initialCode }) {
       </div>
       <p className="big-count">{playerCount}명 참여</p>
       <p className="muted">QR을 스캔하거나 링크로 입장하세요.</p>
-      {(() => {
-        const hasPrior = !!(sessionInfo?.hasPrior ?? (sessionInfo?.hasResult || (sessionInfo?.state && sessionInfo.state !== 'WAITING')));
-        return (
-          <button className="btn primary big" onClick={doStart} disabled={busy}>
-            {hasPrior ? '🔄 게임 재시작' : '🚀 진행 시작'}
-          </button>
-        );
-      })()}
+      <button className="btn primary big" onClick={doStart} disabled={busy}>🚀 진행 시작</button>
       <JoinToastContainer toasts={toasts} />
     </div>
   );
@@ -339,7 +332,7 @@ export default function HostApp({ initialCode }) {
     <div className="host-present">
       <h2>🏆 최종 결과</h2>
       <FinalResult data={result} />
-      <button className="btn ghost big next-btn" onClick={async () => { await refreshSession(); setPhase(Phase.LOBBY); }}>← 로비로</button>
+      <button className="btn ghost big next-btn" onClick={async () => { await refreshSession(); setPhase(Phase.SETUP); }}>← 설정으로</button>
     </div>
   );
 
