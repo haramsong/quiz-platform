@@ -178,9 +178,32 @@ async function closeQuestion(code, order) {
     (a.GSI1SK || '').localeCompare(b.GSI1SK || '')
   );
   const entries = sorted.map((r, i) => ({
-    rank: i + 1, nickname: nameById[r.playerId] || '?',
+    rank: i + 1, playerId: r.playerId, nickname: nameById[r.playerId] || '?',
     isCorrect: r.isCorrect, elapsedSec: round2(r.elapsedMs), score: r.scoreAwarded,
   }));
+
+  // fastest correct answerer (highlighted on the host screen)
+  const firstCorrect = sorted.find((r) => r.isCorrect);
+  const topCorrect = firstCorrect
+    ? { nickname: nameById[firstCorrect.playerId] || '?', elapsedSec: round2(firstCorrect.elapsedMs) }
+    : null;
+
+  // choice distribution (objective questions only) — percentage per choice
+  let distribution = null;
+  if (q && (q.type === 'SINGLE' || q.type === 'MULTI')) {
+    const counts = Object.fromEntries((q.choices || []).map((c) => [c.id, 0]));
+    for (const r of rows) {
+      const picks = Array.isArray(r.submitted) ? r.submitted : (r.submitted != null ? [r.submitted] : []);
+      for (const id of picks) if (id in counts) counts[id] += 1;
+    }
+    const totalPicks = Object.values(counts).reduce((a, b) => a + b, 0) || 1;
+    distribution = (q.choices || []).map((c) => ({
+      id: c.id, text: c.text,
+      count: counts[c.id] || 0,
+      percent: Math.round(((counts[c.id] || 0) / totalPicks) * 100),
+      isCorrect: (q.correctChoiceIds || []).includes(c.id),
+    }));
+  }
 
   // human-readable correct answer for the leaderboard
   let correctAnswer = null;
@@ -202,6 +225,7 @@ async function closeQuestion(code, order) {
     order, qType: q?.type || null,
     correctChoiceIds: q?.correctChoiceIds || null,
     correctAnswer, acceptedAnswers,
+    topCorrect, distribution,
     entries, hasNext: order < questions.length,
   });
 }
@@ -216,15 +240,44 @@ async function endQuiz(code, meta) {
   const players = await queryByPk(PK(code), 'PLAYER#');
   const ranking = drawWinners(players, meta?.prizeWinners || 1);
   const prizeWinners = meta?.prizeWinners || 1;
+  const nameById = Object.fromEntries(players.map((p) => [p.playerId, p.nickname]));
+
+  // ----- fun stats from every answer (correct or wrong; elapsedMs is always stored) -----
+  const answers = await queryByPk(PK(code), 'ANSWER#', { ttlGuard: false });
+  // ① fastest overall participant: lowest AVERAGE response time (min 1 answer)
+  // ② best reaction: single fastest answer across all questions
+  const perPlayer = {}; // playerId -> { sum, n }
+  let bestReaction = null; // { playerId, order, elapsedMs }
+  for (const a of answers) {
+    const ms = typeof a.elapsedMs === 'number' ? a.elapsedMs : null;
+    if (ms == null) continue;
+    (perPlayer[a.playerId] ||= { sum: 0, n: 0 });
+    perPlayer[a.playerId].sum += ms;
+    perPlayer[a.playerId].n += 1;
+    if (!bestReaction || ms < bestReaction.elapsedMs) {
+      bestReaction = { playerId: a.playerId, order: a.order, elapsedMs: ms };
+    }
+  }
+  let fastestPlayer = null; // { playerId, avgMs }
+  for (const [pid, s] of Object.entries(perPlayer)) {
+    const avg = s.sum / s.n;
+    if (!fastestPlayer || avg < fastestPlayer.avgMs) fastestPlayer = { playerId: pid, avgMs: avg };
+  }
+  const funFastest = fastestPlayer
+    ? { nickname: nameById[fastestPlayer.playerId] || '?', avgSec: Math.round(fastestPlayer.avgMs / 10) / 100 }
+    : null;
+  const funReaction = bestReaction
+    ? { nickname: nameById[bestReaction.playerId] || '?', order: bestReaction.order, elapsedSec: Math.round(bestReaction.elapsedMs / 10) / 100 }
+    : null;
 
   // persist a snapshot so the host can review it later (lottery is non-reproducible)
   const session = await getItem(PK(code), SK.session());
   await putItem({
     PK: PK(code), SK: 'RESULT#final', entityType: 'RESULT',
-    ranking, prizeWinners, endedAt: Date.now(),
+    ranking, prizeWinners, funFastest, funReaction, endedAt: Date.now(),
     expireAt: session?.expireAt,
   }).catch(() => {});
 
-  await broadcast(code, { type: 'final_result', ranking, prizeWinners });
+  await broadcast(code, { type: 'final_result', ranking, prizeWinners, funFastest, funReaction });
   return ok();
 }

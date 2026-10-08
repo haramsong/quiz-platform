@@ -60,6 +60,8 @@ async function getResult(event) {
     code,
     ranking: result.ranking || [],
     prizeWinners: result.prizeWinners || 1,
+    funFastest: result.funFastest || null,
+    funReaction: result.funReaction || null,
     endedAt: result.endedAt || null,
   });
 }

@@ -174,42 +174,61 @@ export default function PlayerApp({ initialCode }) {
     );
   }
 
-  if (phase === Phase.LEADERBOARD && lb) return (
-    <div className="page-compact">
-      <h2 className="center-text">Q{lb.order} 리더보드</h2>
-      <AnswerReveal lb={lb} />
-      <div className="lb-list">
-        {lb.entries.map((e, i) => {
-          const isMe = e.nickname === nickname;
-          return (
-            <div key={i} className={`lb-row ${isMe ? 'me' : ''} ${e.isCorrect ? 'correct' : 'wrong'}`}>
-              <span className="rank">#{e.rank}</span>
-              <span className="name">{e.nickname}</span>
-              <span className="time">{e.isCorrect ? `${e.elapsedSec}s` : '✗'}</span>
-              <span className="pts">+{e.score}</span>
-            </div>
-          );
-        })}
-      </div>
-      {lb.hasNext && <p className="muted center-text">다음 문제를 기다리는 중…</p>}
-    </div>
-  );
-
-  if (phase === Phase.RESULT && result) {
-    const me = result.ranking.find((r) => r.nickname === nickname);
+  if (phase === Phase.LEADERBOARD && lb) {
+    const myId = token ? token.slice(token.indexOf(':') + 1) : null;
+    const mine = (lb.entries || []).find((e) => e.playerId === myId);
     return (
       <div className="page-compact">
-        <h2>🏆 최종 결과</h2>
+        <h2 className="center-text">Q{lb.order} 결과</h2>
+
+        {mine ? (
+          <div className={`my-answer ${mine.isCorrect ? 'correct' : 'wrong'}`}>
+            {mine.isCorrect ? `✅ 정답! (${mine.elapsedSec}s) +${mine.score}점` : '❌ 오답'}
+          </div>
+        ) : (
+          <div className="my-answer wrong">⏳ 미응답</div>
+        )}
+
+        <AnswerReveal lb={lb} />
+
+        {lb.distribution && (
+          <div className="dist-list">
+            {lb.distribution.map((d) => (
+              <div key={d.id} className={`dist-row ${d.isCorrect ? 'correct' : ''}`}>
+                <div className="dist-head">
+                  <span className="dist-text">{d.isCorrect ? '✓ ' : ''}{d.text}</span>
+                  <span className="dist-pct">{d.percent}%</span>
+                </div>
+                <div className="dist-bar"><div className="dist-fill" style={{ width: `${d.percent}%` }} /></div>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {lb.hasNext && <p className="muted center-text">다음 문제를 기다리는 중…</p>}
+      </div>
+    );
+  }
+
+  if (phase === Phase.RESULT && result) {
+    const myId = token ? token.slice(token.indexOf(':') + 1) : null;
+    const me = result.ranking.find((r) => r.playerId === myId) || result.ranking.find((r) => r.nickname === nickname);
+    const top5 = result.ranking.slice(0, 5);
+    return (
+      <div className="page-compact">
+        <h2 className="center-text">🏆 최종 결과</h2>
+
         {me && (
           <div className={`my-result ${me.isWinner ? 'winner' : ''}`}>
             <span className="big-rank">#{me.rank}</span>
             <span>{me.nickname} — {me.totalScore}점</span>
-            {me.isWinner && <span className="prize">🎉 {me.winReason === 'FIRST' ? '1등 당첨!' : '랜덤 당첨!'}</span>}
+            {me.isWinner && <span className="prize">🎉 당첨되었습니다!</span>}
           </div>
         )}
+
         <div className="lb-list">
-          {result.ranking.map((r, i) => (
-            <div key={i} className={`lb-row ${r.nickname === nickname ? 'me' : ''} ${r.isWinner ? 'winner-row' : ''}`}>
+          {top5.map((r, i) => (
+            <div key={i} className={`lb-row ${r.playerId === myId ? 'me' : ''} ${r.isWinner ? 'winner-row' : ''}`}>
               <span className="rank">#{r.rank}</span>
               <span className="name">{r.nickname}</span>
               <span className="pts">{r.totalScore}점</span>
@@ -218,6 +237,25 @@ export default function PlayerApp({ initialCode }) {
             </div>
           ))}
         </div>
+
+        {(result.funFastest || result.funReaction) && (
+          <div className="fun-stats">
+            {result.funFastest && (
+              <div className="fun-card">
+                <div className="fun-label">🏃 가장 빠른 참가자</div>
+                <div className="fun-name">{result.funFastest.nickname}</div>
+                <div className="fun-sub">평균 {result.funFastest.avgSec}s</div>
+              </div>
+            )}
+            {result.funReaction && (
+              <div className="fun-card">
+                <div className="fun-label">⚡ 최고 반응속도</div>
+                <div className="fun-name">{result.funReaction.nickname}</div>
+                <div className="fun-sub">Q{result.funReaction.order} · {result.funReaction.elapsedSec}s</div>
+              </div>
+            )}
+          </div>
+        )}
       </div>
     );
   }

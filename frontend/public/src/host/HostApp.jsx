@@ -4,6 +4,7 @@ import { connect, send, disconnect } from '../ws';
 import SetupPage from './SetupPage';
 import { JoinToastContainer, createToast } from './JoinToast';
 import PlayQR from './PlayQR';
+import FinalResult from './FinalResult';
 import AnswerReveal from '../AnswerReveal';
 import { useToast } from '../Toast';
 import { useConfirm } from '../Confirm';
@@ -259,16 +260,7 @@ export default function HostApp({ initialCode }) {
           {new Date(pastResult.endedAt).toLocaleString('ko-KR')} 종료
         </p>
       )}
-      <div className="lb-list host-lb">
-        {pastResult.ranking.map((r, i) => (
-          <div key={i} className={`lb-row big ${r.isWinner ? 'winner-row' : ''}`}>
-            <span className="rank">#{r.rank}</span>
-            <span className="name">{r.nickname}</span>
-            <span className="pts">{r.totalScore}점 ({r.totalTimeSec}s)</span>
-            {r.isWinner && <span className="badge-win">{r.winReason === 'FIRST' ? '🥇' : '🎁'}</span>}
-          </div>
-        ))}
-      </div>
+      <FinalResult data={pastResult} />
       <button className="btn ghost big next-btn" onClick={() => setPhase(Phase.LOBBY)}>← 로비로</button>
     </div>
   );
@@ -308,18 +300,33 @@ export default function HostApp({ initialCode }) {
   if (phase === Phase.LB && lb) return (
     <div className="host-present">
       <button className="btn ghost tiny corner-lobby" onClick={backToLobby}>← 로비</button>
-      <h2>Q{lb.order} 리더보드</h2>
+      <h2>Q{lb.order} 결과</h2>
       <AnswerReveal lb={lb} />
-      <div className="lb-list host-lb">
-        {lb.entries.slice(0, 10).map((e, i) => (
-          <div key={i} className={`lb-row big ${e.isCorrect ? 'correct' : 'wrong'}`}>
-            <span className="rank">#{e.rank}</span>
-            <span className="name">{e.nickname}</span>
-            <span className="time">{e.isCorrect ? `${e.elapsedSec}s` : '✗'}</span>
-            <span className="pts">+{e.score}</span>
-          </div>
-        ))}
-      </div>
+
+      {lb.topCorrect ? (
+        <div className="fastest-card">
+          <div className="fastest-label">⚡ 가장 빨리 맞춘 사람</div>
+          <div className="fastest-name">{lb.topCorrect.nickname}</div>
+          <div className="fastest-time">{lb.topCorrect.elapsedSec}s</div>
+        </div>
+      ) : (
+        <p className="muted center-text">정답자가 없어요 😅</p>
+      )}
+
+      {lb.distribution && (
+        <div className="dist-list">
+          {lb.distribution.map((d) => (
+            <div key={d.id} className={`dist-row ${d.isCorrect ? 'correct' : ''}`}>
+              <div className="dist-head">
+                <span className="dist-text">{d.isCorrect ? '✓ ' : ''}{d.text}</span>
+                <span className="dist-pct">{d.percent}% ({d.count})</span>
+              </div>
+              <div className="dist-bar"><div className="dist-fill" style={{ width: `${d.percent}%` }} /></div>
+            </div>
+          ))}
+        </div>
+      )}
+
       {lb.hasNext ? (
         <button className="btn primary big next-btn" onClick={doNext}>➡️ 다음 문제</button>
       ) : (
@@ -331,16 +338,7 @@ export default function HostApp({ initialCode }) {
   if (phase === Phase.RESULT && result) return (
     <div className="host-present">
       <h2>🏆 최종 결과</h2>
-      <div className="lb-list host-lb">
-        {result.ranking.map((r, i) => (
-          <div key={i} className={`lb-row big ${r.isWinner ? 'winner-row' : ''}`}>
-            <span className="rank">#{r.rank}</span>
-            <span className="name">{r.nickname}</span>
-            <span className="pts">{r.totalScore}점 ({r.totalTimeSec}s)</span>
-            {r.isWinner && <span className="badge-win">{r.winReason === 'FIRST' ? '🥇' : '🎁'}</span>}
-          </div>
-        ))}
-      </div>
+      <FinalResult data={result} />
       <button className="btn ghost big next-btn" onClick={async () => { await refreshSession(); setPhase(Phase.LOBBY); }}>← 로비로</button>
     </div>
   );
