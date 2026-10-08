@@ -295,10 +295,21 @@ h1, h2, .player-q-body, .choice-line, .host-choice .text, .big-count,
 .confirm-box {
   background: var(--panel); border: 1px solid var(--border); border-radius: 14px;
   padding: 1.5rem; width: min(420px, 92vw); box-shadow: 0 20px 60px rgba(0,0,0,.5);
+  position: relative;
 }
-.confirm-title { margin: 0 0 .6rem; font-size: 1.15rem; }
+.confirm-title { margin: 0 0 .6rem; font-size: 1.15rem; padding-right: 1.75rem; }
 .confirm-msg { margin: 0 0 1.25rem; color: var(--muted); white-space: pre-line; line-height: 1.5; }
 .confirm-actions { display: flex; justify-content: flex-end; gap: .5rem; }
+
+/* shared top-right X close button for modals */
+.modal-close {
+  position: absolute; top: .7rem; right: .7rem;
+  width: 2rem; height: 2rem; display: grid; place-items: center;
+  border: none; background: transparent; color: var(--muted);
+  font-size: 1.1rem; line-height: 1; border-radius: 8px; cursor: pointer;
+  transition: background .12s, color .12s;
+}
+.modal-close:hover { background: rgba(127,127,127,.18); color: var(--text, #fff); }
 
 /* keep the corner "뒤로/로비" button clear of centered lobby content */
 .host-present.center { padding-top: 3.5rem; }
@@ -471,14 +482,16 @@ h1, h2, .player-q-body, .choice-line, .host-choice .text, .big-count,
 .q-list-actions .btn.tiny { padding: .3rem .55rem; }
 
 /* ===== Excel import/export modal ===== */
-.excel-modal { max-width: 640px; width: calc(100vw - 2rem); text-align: left; }
-.excel-fields { margin: .75rem 0; max-height: 55vh; overflow-y: auto; }
+.excel-modal { max-width: 560px; width: min(560px, 92vw); text-align: left; max-height: 88vh; overflow-y: auto; overflow-x: hidden; }
+.excel-fields { margin: .75rem 0; }
 .excel-fields-title { font-weight: 700; margin: .6rem 0 .3rem; font-size: .9rem; }
-.excel-field-table { width: 100%; border-collapse: collapse; font-size: .82rem; }
-.excel-field-table th, .excel-field-table td { border: 1px solid var(--border, #e2e2e2); padding: .35rem .5rem; vertical-align: top; text-align: left; }
-.excel-field-table th { background: rgba(0,0,0,.04); font-weight: 600; white-space: nowrap; }
-.excel-field-table code { background: rgba(0,0,0,.06); padding: .05rem .3rem; border-radius: 4px; font-size: .9em; }
-.excel-example-table { font-family: ui-monospace, Menlo, Consolas, monospace; }
+.excel-field-table { width: 100%; border-collapse: collapse; font-size: .82rem; table-layout: fixed; }
+.excel-field-table th, .excel-field-table td { border: 1px solid var(--border, #e2e2e2); padding: .35rem .5rem; vertical-align: top; text-align: left; word-break: break-word; overflow-wrap: anywhere; }
+.excel-field-table th { background: rgba(127,127,127,.12); font-weight: 600; }
+.excel-field-table code { background: rgba(127,127,127,.16); padding: .05rem .3rem; border-radius: 4px; font-size: .9em; overflow-wrap: anywhere; }
+/* only the wide example table scrolls horizontally if it must */
+.excel-example-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+.excel-example-table { font-family: ui-monospace, Menlo, Consolas, monospace; min-width: 480px; table-layout: auto; }
 .excel-example-table td, .excel-example-table th { white-space: nowrap; }
-.excel-actions { display: flex; gap: .5rem; margin-top: .5rem; flex-wrap: wrap; }
+.excel-actions { display: flex; gap: .5rem; margin-top: .75rem; flex-wrap: wrap; }
 .excel-act-btn { flex: 1 1 0; min-width: 140px; text-align: center; justify-content: center; cursor: pointer; }

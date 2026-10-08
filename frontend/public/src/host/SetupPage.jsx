@@ -354,6 +354,7 @@ export default function SetupPage({ code, pin, quizData, onRefresh, onStartQuiz,
       {excelModalOpen && (
         <div className="confirm-backdrop" onClick={() => setExcelModalOpen(false)}>
           <div className="confirm-box excel-modal" onClick={(e) => e.stopPropagation()}>
+            <button className="modal-close" onClick={() => setExcelModalOpen(false)} aria-label="닫기">✕</button>
             <h3 className="confirm-title">📊 엑셀 / CSV</h3>
             <p className="confirm-msg">엑셀(.xlsx) 또는 CSV로 문제를 가져오거나 내보냅니다. 가져오기는 기존 문제 <b>뒤에 추가</b>돼요.</p>
 
@@ -374,16 +375,18 @@ export default function SetupPage({ code, pin, quizData, onRefresh, onStartQuiz,
               </table>
 
               <div className="excel-fields-title">예시 행</div>
-              <table className="excel-field-table excel-example-table">
-                <thead>
-                  <tr><th>type</th><th>body</th><th>choices</th><th>answer</th><th>points</th><th>timeSec</th></tr>
-                </thead>
-                <tbody>
-                  <tr><td>SINGLE</td><td>수도는?</td><td>서울|부산|대구</td><td>서울</td><td>2</td><td>15</td></tr>
-                  <tr><td>MULTI</td><td>서버리스는?</td><td>Lambda|EC2|DynamoDB</td><td>Lambda|DynamoDB</td><td></td><td></td></tr>
-                  <tr><td>TEXT</td><td>AWS 함수 서비스?</td><td></td><td>Lambda|람다</td><td>1</td><td>10</td></tr>
-                </tbody>
-              </table>
+              <div className="excel-example-wrap">
+                <table className="excel-field-table excel-example-table">
+                  <thead>
+                    <tr><th>type</th><th>body</th><th>choices</th><th>answer</th><th>points</th><th>timeSec</th></tr>
+                  </thead>
+                  <tbody>
+                    <tr><td>SINGLE</td><td>수도는?</td><td>서울|부산|대구</td><td>서울</td><td>2</td><td>15</td></tr>
+                    <tr><td>MULTI</td><td>서버리스는?</td><td>Lambda|EC2|DynamoDB</td><td>Lambda|DynamoDB</td><td></td><td></td></tr>
+                    <tr><td>TEXT</td><td>AWS 함수 서비스?</td><td></td><td>Lambda|람다</td><td>1</td><td>10</td></tr>
+                  </tbody>
+                </table>
+              </div>
               <p className="muted small">💡 처음이면 <b>내보내기</b>로 받은 파일을 템플릿처럼 편집해 다시 가져오면 형식이 정확해요. CSV는 <b>UTF-8</b>로 저장하세요.</p>
             </div>
 
@@ -396,9 +399,6 @@ export default function SetupPage({ code, pin, quizData, onRefresh, onStartQuiz,
                 ⬇︎ 내보내기{questions.length === 0 ? ' (빈 템플릿)' : ` (${questions.length}문제)`}
               </button>
             </div>
-            <div className="confirm-actions">
-              <button className="btn ghost" onClick={() => setExcelModalOpen(false)}>닫기</button>
-            </div>
           </div>
         </div>
       )}
@@ -406,6 +406,7 @@ export default function SetupPage({ code, pin, quizData, onRefresh, onStartQuiz,
       {printModalOpen && (
         <div className="confirm-backdrop" onClick={() => setPrintModalOpen(false)}>
           <div className="confirm-box" onClick={(e) => e.stopPropagation()}>
+            <button className="modal-close" onClick={() => setPrintModalOpen(false)} aria-label="닫기">✕</button>
             <h3 className="confirm-title">🖨️ 인쇄 / PDF</h3>
             <p className="confirm-msg">무엇을 인쇄할까요?</p>
             <div className="print-mode-options">
@@ -419,9 +420,6 @@ export default function SetupPage({ code, pin, quizData, onRefresh, onStartQuiz,
                 📚 문제 + 답안<span className="print-mode-sub">문제 → 답안 (한 문제씩)</span>
               </button>
             </div>
-            <div className="confirm-actions">
-              <button className="btn ghost" onClick={() => setPrintModalOpen(false)}>취소</button>
-            </div>
           </div>
         </div>
       )}
@@ -429,6 +427,7 @@ export default function SetupPage({ code, pin, quizData, onRefresh, onStartQuiz,
       {pastResult && (
         <div className="confirm-backdrop" onClick={() => setPastResult(null)}>
           <div className="confirm-box result-modal" onClick={(e) => e.stopPropagation()}>
+            <button className="modal-close" onClick={() => setPastResult(null)} aria-label="닫기">✕</button>
             <h3 className="confirm-title">📊 지난 게임 기록</h3>
             {pastResult.endedAt && (
               <p className="muted small">{new Date(pastResult.endedAt).toLocaleString('ko-KR')} 종료</p>
@@ -442,9 +441,6 @@ export default function SetupPage({ code, pin, quizData, onRefresh, onStartQuiz,
                   {r.isWinner && <span>{r.winReason === 'FIRST' ? '🥇' : '🎁'}</span>}
                 </div>
               ))}
-            </div>
-            <div className="confirm-actions">
-              <button className="btn primary" onClick={() => setPastResult(null)}>닫기</button>
             </div>
           </div>
         </div>
