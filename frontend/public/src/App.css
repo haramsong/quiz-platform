@@ -469,3 +469,16 @@ h1, h2, .player-q-body, .choice-line, .host-choice .text, .big-count,
 /* ===== Question list actions (excel import/export + add) ===== */
 .q-list-actions { display: flex; gap: .35rem; align-items: center; flex-wrap: wrap; }
 .q-list-actions .btn.tiny { padding: .3rem .55rem; }
+
+/* ===== Excel import/export modal ===== */
+.excel-modal { max-width: 640px; width: calc(100vw - 2rem); text-align: left; }
+.excel-fields { margin: .75rem 0; max-height: 55vh; overflow-y: auto; }
+.excel-fields-title { font-weight: 700; margin: .6rem 0 .3rem; font-size: .9rem; }
+.excel-field-table { width: 100%; border-collapse: collapse; font-size: .82rem; }
+.excel-field-table th, .excel-field-table td { border: 1px solid var(--border, #e2e2e2); padding: .35rem .5rem; vertical-align: top; text-align: left; }
+.excel-field-table th { background: rgba(0,0,0,.04); font-weight: 600; white-space: nowrap; }
+.excel-field-table code { background: rgba(0,0,0,.06); padding: .05rem .3rem; border-radius: 4px; font-size: .9em; }
+.excel-example-table { font-family: ui-monospace, Menlo, Consolas, monospace; }
+.excel-example-table td, .excel-example-table th { white-space: nowrap; }
+.excel-actions { display: flex; gap: .5rem; margin-top: .5rem; flex-wrap: wrap; }
+.excel-act-btn { flex: 1 1 0; min-width: 140px; text-align: center; justify-content: center; cursor: pointer; }

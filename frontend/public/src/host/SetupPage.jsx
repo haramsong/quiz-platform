@@ -36,6 +36,7 @@ export default function SetupPage({ code, pin, quizData, onRefresh, onStartQuiz,
   const [pastResult, setPastResult] = useState(null); // modal data
   const [printMode, setPrintMode] = useState('answer'); // 'question' | 'answer' | 'both'
   const [printModalOpen, setPrintModalOpen] = useState(false);
+  const [excelModalOpen, setExcelModalOpen] = useState(false);
   const initedRef = useRef(false);
 
   // Initialize from server data only once (avoid clobbering unsaved local edits).
@@ -176,8 +177,9 @@ export default function SetupPage({ code, pin, quizData, onRefresh, onStartQuiz,
   };
 
   const exportExcel = () => {
-    if (questions.length === 0) { toast.show('내보낼 문제가 없어요', { type: 'error' }); return; }
+    // 빈 목록이면 컬럼(헤더)만 있는 템플릿을 내보냄
     downloadXlsx(questions, `${(title || code)}-문제.xlsx`);
+    setExcelModalOpen(false);
   };
 
   const importExcel = async (e) => {
@@ -194,6 +196,7 @@ export default function SetupPage({ code, pin, quizData, onRefresh, onStartQuiz,
         return [...prev, ...appended];
       });
       toast.show(`${parsed.length}문제를 가져왔어요 (저장을 눌러 반영)`, { type: 'success' });
+      setExcelModalOpen(false);
     } catch {
       toast.show('엑셀을 읽지 못했어요', { type: 'error' });
     }
@@ -313,11 +316,7 @@ export default function SetupPage({ code, pin, quizData, onRefresh, onStartQuiz,
             <div className="panel-head">
               <h3>문제 목록</h3>
               <div className="q-list-actions">
-                <label className="btn tiny ghost" title="엑셀(.xlsx)/CSV에서 문제 가져오기 (추가)">
-                  ⬆︎ 가져오기
-                  <input type="file" accept=".xlsx,.xls,.csv" onChange={importExcel} hidden />
-                </label>
-                <button className="btn tiny ghost" onClick={exportExcel} title="현재 문제를 엑셀로 내보내기">⬇︎ 내보내기</button>
+                <button className="btn tiny ghost" onClick={() => setExcelModalOpen(true)} title="엑셀/CSV로 문제 가져오기·내보내기">📊 엑셀</button>
                 <button className="btn tiny primary" onClick={addQuestion}>+ 추가</button>
               </div>
             </div>
@@ -351,6 +350,58 @@ export default function SetupPage({ code, pin, quizData, onRefresh, onStartQuiz,
           )}
         </main>
       </div>
+
+      {excelModalOpen && (
+        <div className="confirm-backdrop" onClick={() => setExcelModalOpen(false)}>
+          <div className="confirm-box excel-modal" onClick={(e) => e.stopPropagation()}>
+            <h3 className="confirm-title">📊 엑셀 / CSV</h3>
+            <p className="confirm-msg">엑셀(.xlsx) 또는 CSV로 문제를 가져오거나 내보냅니다. 가져오기는 기존 문제 <b>뒤에 추가</b>돼요.</p>
+
+            <div className="excel-fields">
+              <div className="excel-fields-title">컬럼 설명</div>
+              <table className="excel-field-table">
+                <thead>
+                  <tr><th>컬럼</th><th>설명</th><th>예시</th></tr>
+                </thead>
+                <tbody>
+                  <tr><td><code>type</code></td><td>문제 유형: <code>SINGLE</code>(객관식 단일) / <code>MULTI</code>(객관식 복수) / <code>TEXT</code>(주관식)</td><td>SINGLE</td></tr>
+                  <tr><td><code>body</code></td><td>문제 본문</td><td>대한민국의 수도는?</td></tr>
+                  <tr><td><code>choices</code></td><td>보기 목록, <code>|</code>로 구분 (주관식은 비움)</td><td>서울|부산|대구</td></tr>
+                  <tr><td><code>answer</code></td><td>객관식: 정답 보기 텍스트(복수는 <code>|</code>)<br/>주관식: 정답<code>|</code>유사정답<code>|</code>…</td><td>서울<br/>Lambda|람다</td></tr>
+                  <tr><td><code>points</code></td><td>배점 (비우면 <b>1</b>)</td><td>2</td></tr>
+                  <tr><td><code>timeSec</code></td><td>제한시간(초) (비우면 <b>10</b>)</td><td>15</td></tr>
+                </tbody>
+              </table>
+
+              <div className="excel-fields-title">예시 행</div>
+              <table className="excel-field-table excel-example-table">
+                <thead>
+                  <tr><th>type</th><th>body</th><th>choices</th><th>answer</th><th>points</th><th>timeSec</th></tr>
+                </thead>
+                <tbody>
+                  <tr><td>SINGLE</td><td>수도는?</td><td>서울|부산|대구</td><td>서울</td><td>2</td><td>15</td></tr>
+                  <tr><td>MULTI</td><td>서버리스는?</td><td>Lambda|EC2|DynamoDB</td><td>Lambda|DynamoDB</td><td></td><td></td></tr>
+                  <tr><td>TEXT</td><td>AWS 함수 서비스?</td><td></td><td>Lambda|람다</td><td>1</td><td>10</td></tr>
+                </tbody>
+              </table>
+              <p className="muted small">💡 처음이면 <b>내보내기</b>로 받은 파일을 템플릿처럼 편집해 다시 가져오면 형식이 정확해요. CSV는 <b>UTF-8</b>로 저장하세요.</p>
+            </div>
+
+            <div className="excel-actions">
+              <label className="btn primary excel-act-btn">
+                ⬆︎ 가져오기 (추가)
+                <input type="file" accept=".xlsx,.xls,.csv" onChange={importExcel} hidden />
+              </label>
+              <button className="btn ghost excel-act-btn" onClick={exportExcel}>
+                ⬇︎ 내보내기{questions.length === 0 ? ' (빈 템플릿)' : ` (${questions.length}문제)`}
+              </button>
+            </div>
+            <div className="confirm-actions">
+              <button className="btn ghost" onClick={() => setExcelModalOpen(false)}>닫기</button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {printModalOpen && (
         <div className="confirm-backdrop" onClick={() => setPrintModalOpen(false)}>
