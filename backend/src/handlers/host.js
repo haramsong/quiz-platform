@@ -41,12 +41,18 @@ async function getSession(event) {
   if (!(await authHost(event, code))) return error(403, 'INVALID_PIN', 'host auth failed');
   const session = await getItem(PK(code), SK.session());
   const players = await queryByPk(PK(code), 'PLAYER#');
+  const conns = await queryGsi1(CONN_INDEX(code));
+  const connectedPlayers = conns.filter((c) => c.role === 'player').length;
   const result = await getItem(PK(code), 'RESULT#final');
+  const state = session?.state || 'WAITING';
   return ok({
     code,
-    state: session?.state || 'WAITING',
-    playerCount: players.length,
+    state,
+    playerCount: connectedPlayers,          // currently connected players (live)
+    joinedCount: players.length,            // registered PLAYER records
     hasResult: !!result,
+    // a prior game exists only if it finished or is mid-run — NOT merely by join records
+    hasPrior: !!result || state !== 'WAITING',
   });
 }
 
@@ -79,7 +85,10 @@ async function resetGame(event) {
   const addKey = (pk, sk) => keyMap.set(`${pk}\u0000${sk}`, { PK: pk, SK: sk });
   for (const i of players) addKey(i.PK, i.SK);
   for (const i of answers) addKey(i.PK, i.SK);
+  // delete ONLY player connections — keep host connections alive so the host
+  // keeps receiving player_joined broadcasts after a reset.
   for (const c of conns) {
+    if (c.role === 'host') continue;
     addKey(c.PK, c.SK);
     if (c.connectionId) addKey(`CONNPTR#${c.connectionId}`, `CONNPTR#${c.connectionId}`);
   }

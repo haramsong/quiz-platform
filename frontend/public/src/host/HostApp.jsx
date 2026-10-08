@@ -150,9 +150,9 @@ export default function HostApp({ initialCode }) {
   };
 
   const doStart = async () => {
-    // if there is leftover participation data or a finished result, confirm reset first
+    // "prior game" = finished result or mid-run session (NOT just connected players)
     const s = sessionInfo || (await refreshSession());
-    const hasPrior = (s?.playerCount || 0) > 0 || s?.hasResult || (s?.state && s.state !== 'WAITING');
+    const hasPrior = !!(s?.hasPrior ?? (s?.hasResult || (s?.state && s.state !== 'WAITING')));
     if (hasPrior) {
       const okReset = await confirm.ask({
         title: '이전 게임 데이터가 있어요',
@@ -241,7 +241,7 @@ export default function HostApp({ initialCode }) {
       <p className="big-count">{playerCount}명 참여</p>
       <p className="muted">QR을 스캔하거나 링크로 입장하세요.</p>
       {(() => {
-        const hasPrior = (sessionInfo?.playerCount || 0) > 0 || sessionInfo?.hasResult || (sessionInfo?.state && sessionInfo.state !== 'WAITING');
+        const hasPrior = !!(sessionInfo?.hasPrior ?? (sessionInfo?.hasResult || (sessionInfo?.state && sessionInfo.state !== 'WAITING')));
         return (
           <button className="btn primary big" onClick={doStart} disabled={busy}>
             {hasPrior ? '🔄 게임 재시작' : '🚀 진행 시작'}
