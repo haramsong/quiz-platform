@@ -453,5 +453,5 @@ h1, h2, .player-q-body, .choice-line, .host-choice .text, .big-count,
 /* ===== Numeric fields (points / time limit) in question editor ===== */
 .inline-fields { display: flex; gap: 2rem; }
 .num-field { display: flex; flex-direction: row; align-items: center; gap: .6rem; }
-.num-field > span { font-size: .9rem; color: var(--muted); white-space: nowrap; }
+.num-field > span { font-size: .9rem; color: var(--muted); white-space: nowrap; margin-right: .5rem; }
 .num-field > input { width: 90px; }
