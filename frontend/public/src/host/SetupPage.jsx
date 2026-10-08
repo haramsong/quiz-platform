@@ -25,7 +25,6 @@ export default function SetupPage({ code, pin, quizData, onRefresh, onStartQuiz,
   const toast = useToast();
   const confirm = useConfirm();
   const [title, setTitle] = useState(quizData?.title || '');
-  const [timeout, setTimeout_] = useState(quizData?.timeoutSec || 20);
   const [prizeWinners, setPrize] = useState(quizData?.prizeWinners || 1);
   const [thumbnailKey, setThumbKey] = useState(quizData?.thumbnailKey || null);
   const [thumbPreview, setThumbPreview] = useState(quizData?.thumbnailUrl || null);
@@ -41,7 +40,6 @@ export default function SetupPage({ code, pin, quizData, onRefresh, onStartQuiz,
     if (quizData && !initedRef.current) {
       initedRef.current = true;
       setTitle(quizData.title || '');
-      setTimeout_(quizData.timeoutSec || 20);
       setPrize(quizData.prizeWinners || 1);
       setThumbKey(quizData.thumbnailKey || null);
       setThumbPreview(quizData.thumbnailUrl || null);
@@ -51,7 +49,7 @@ export default function SetupPage({ code, pin, quizData, onRefresh, onStartQuiz,
 
   const saveSettings = async () => {
     setSaving(true); setMsg('');
-    await apiCall('/quizzes', code, pin, { method: 'POST', body: { code, title, timeoutSec: timeout, prizeWinners, thumbnailKey } });
+    await apiCall('/quizzes', code, pin, { method: 'POST', body: { code, title, prizeWinners, thumbnailKey } });
     setSaving(false); setMsg('설정 저장됨');
     setTimeout(() => setMsg(''), 2000);
   };
@@ -61,7 +59,7 @@ export default function SetupPage({ code, pin, quizData, onRefresh, onStartQuiz,
     setSaving(true); setMsg('저장 중…');
     try {
       // settings are lightweight — always save
-      await apiCall('/quizzes', code, pin, { method: 'POST', body: { code, title, timeoutSec: timeout, prizeWinners, thumbnailKey } });
+      await apiCall('/quizzes', code, pin, { method: 'POST', body: { code, title, prizeWinners, thumbnailKey } });
       const changed = questions.filter((q) => q._new || q._dirty);
       for (const q of changed) {
         const body = { ...q }; delete body._new; delete body._dirty; delete body.imageUrl;
@@ -162,7 +160,7 @@ export default function SetupPage({ code, pin, quizData, onRefresh, onStartQuiz,
   const addQuestion = () => {
     const maxOrder = questions.reduce((m, q) => Math.max(m, q.order || 0), 0);
     const order = maxOrder + 1;
-    const q = { order, type: 'SINGLE', body: '', choices: [{ id: 'a', text: '' }, { id: 'b', text: '' }], correctChoiceIds: [], correctText: '', acceptedAnswers: [], points: 1, imageKey: null, imageUrl: null, _new: true };
+    const q = { order, type: 'SINGLE', body: '', choices: [{ id: 'a', text: '' }, { id: 'b', text: '' }], correctChoiceIds: [], correctText: '', acceptedAnswers: [], points: 1, timeoutSec: 10, imageKey: null, imageUrl: null, _new: true };
     setQuestions((prev) => [...prev, q]);
     setSelIdx(questions.length);
   };
@@ -267,7 +265,6 @@ export default function SetupPage({ code, pin, quizData, onRefresh, onStartQuiz,
           <div className="setup-panel">
             <h3>설정</h3>
             <label>퀴즈 제목<input value={title} onChange={e => setTitle(e.target.value)} placeholder="퀴즈 제목" /></label>
-            <label>문제당 시간(초)<input type="number" min={5} max={300} value={timeout} onChange={e => setTimeout_(+e.target.value)} /></label>
             <label>상품 당첨 인원<input type="number" min={1} max={100} value={prizeWinners} onChange={e => setPrize(+e.target.value)} /></label>
             <label>썸네일 (선택)
               <label className="file-btn">
@@ -437,6 +434,7 @@ function QuestionEditor({ q, idx, onChange, onDelete, onImage, saving }) {
 
       <div className="field">
         <label>배점<input type="number" min={1} max={100} value={q.points || 1} onChange={e => onChange({ points: +e.target.value })} /></label>
+        <label>제한시간(초)<input type="number" min={5} max={300} value={q.timeoutSec ?? 10} onChange={e => onChange({ timeoutSec: +e.target.value })} /></label>
       </div>
 
       <div className="field">

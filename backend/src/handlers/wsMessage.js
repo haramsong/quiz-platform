@@ -79,15 +79,16 @@ async function pushQuestion(code, order) {
       { expiresIn: 3600 }).catch(() => null);
   }
 
+  const timeoutSec = q.timeoutSec || meta?.timeoutSec || 10;
   await broadcast(code, {
     type: 'question_pushed_host',
     order, total, qType: q.type, body: q.body, imageUrl, points: q.points || 1,
-    choices: hostChoices, timeoutSec: meta?.timeoutSec || 20, serverStartAt: now,
+    choices: hostChoices, timeoutSec, serverStartAt: now,
   }, 'host');
   await broadcast(code, {
     type: 'question_pushed_player',
     order, total, qType: q.type, body: q.body, imageUrl, points: q.points || 1,
-    choices: hostChoices, timeoutSec: meta?.timeoutSec || 20, serverStartAt: now,
+    choices: hostChoices, timeoutSec, serverStartAt: now,
   }, 'player');
   return ok();
 }
@@ -123,7 +124,7 @@ async function answer(code, ptr, msg) {
     clientElapsedMs: msg.clientElapsedMs,
     questionStartedAt: session.questionStartedAt,
     recvAt: Date.now(),
-    timeoutSec: meta?.timeoutSec || 20,
+    timeoutSec: q?.timeoutSec || meta?.timeoutSec || 10,
   });
   const points = isCorrect ? (q.points || 1) : 0;
 

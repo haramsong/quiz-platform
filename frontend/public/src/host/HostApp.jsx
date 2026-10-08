@@ -280,7 +280,10 @@ export default function HostApp({ initialCode }) {
         <button className="btn ghost tiny corner-lobby" onClick={backToLobby}>← 로비</button>
         <div className="top-bar">
           <span className="q-num">Q {q.order} / {q.total}</span>
-          <span className="points-badge big">{q.points || 1}점</span>
+          <span className="time-points">
+            <span className={`time-left ${timeLeft <= 5 ? 'urgent' : ''}`}>⏱ {timeLeft}s</span>
+            <span className="points-badge big">{q.points || 1}점</span>
+          </span>
           <span className="progress">응답 {answered}/{playerCount}</span>
         </div>
         <div className={`progress-bar ${frac <= 0.25 ? 'urgent' : ''}`}>

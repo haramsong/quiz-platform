@@ -167,6 +167,7 @@ async function getQuiz(event) {
       correctChoiceIds: q.correctChoiceIds || null, correctText: q.correctText || null,
       acceptedAnswers: q.acceptedAnswers || null, imageKey: q.imageKey || null,
       imageUrl, points: q.points || 1, similarityThreshold: q.similarityThreshold ?? 0.8,
+      timeoutSec: q.timeoutSec || 10,
     });
   }
 
@@ -230,7 +231,8 @@ function buildQuestionItem(code, order, body, expireAt) {
     correctText: body.correctText || null,
     acceptedAnswers: body.acceptedAnswers || null,
     similarityThreshold: body.similarityThreshold ?? 0.8,
-    imageKey: body.imageKey || null, points: Number(body.points) || 1, expireAt,
+    imageKey: body.imageKey || null, points: Number(body.points) || 1,
+    timeoutSec: Number(body.timeoutSec) || 10, expireAt,
   };
 }
 

@@ -19,6 +19,7 @@ export default function PlayerApp({ initialCode }) {
   const [textAns, setTextAns] = useState('');
   const [submitted, setSubmitted] = useState(false);
   const [frac, setFrac] = useState(1);
+  const [secLeft, setSecLeft] = useState(0);
   const startRef = useRef(0); // performance.now at question_pushed
   const deadlineRef = useRef(0);
 
@@ -30,11 +31,13 @@ export default function PlayerApp({ initialCode }) {
 
   const startTimer = useCallback((sec) => {
     setFrac(1);
+    setSecLeft(sec);
     clearInterval(timerRef.current);
     deadlineRef.current = Date.now() + sec * 1000;
     timerRef.current = setInterval(() => {
       const remain = deadlineRef.current - Date.now();
       setFrac(Math.max(0, remain / (sec * 1000)));
+      setSecLeft(Math.max(0, Math.ceil(remain / 1000)));
       if (remain <= 0) clearInterval(timerRef.current);
     }, 100);
   }, []);
@@ -126,6 +129,7 @@ export default function PlayerApp({ initialCode }) {
         <div className="top-bar">
           <div className="top-left">
             <span className="q-num">Q {q.order} / {q.total}</span>
+            <span className={`time-left ${secLeft <= 5 ? 'urgent' : ''}`}>⏱ {secLeft}s</span>
             <span className="points-badge">{q.points || 1}점</span>
           </div>
           <span className="submitted-badge" style={{ visibility: submitted ? 'visible' : 'hidden' }}>✅ 제출 완료</span>
