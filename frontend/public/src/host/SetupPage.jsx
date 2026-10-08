@@ -375,18 +375,16 @@ export default function SetupPage({ code, pin, quizData, onRefresh, onStartQuiz,
               </table>
 
               <div className="excel-fields-title">예시 행</div>
-              <div className="excel-example-wrap">
-                <table className="excel-field-table excel-example-table">
-                  <thead>
-                    <tr><th>type</th><th>body</th><th>choices</th><th>answer</th><th>points</th><th>timeSec</th></tr>
-                  </thead>
-                  <tbody>
-                    <tr><td>SINGLE</td><td>수도는?</td><td>서울|부산|대구</td><td>서울</td><td>2</td><td>15</td></tr>
-                    <tr><td>MULTI</td><td>서버리스는?</td><td>Lambda|EC2|DynamoDB</td><td>Lambda|DynamoDB</td><td></td><td></td></tr>
-                    <tr><td>TEXT</td><td>AWS 함수 서비스?</td><td></td><td>Lambda|람다</td><td>1</td><td>10</td></tr>
-                  </tbody>
-                </table>
-              </div>
+              <table className="excel-field-table excel-example-table">
+                <thead>
+                  <tr><th>type</th><th>body</th><th>choices</th><th>answer</th><th>points</th><th>timeSec</th></tr>
+                </thead>
+                <tbody>
+                  <tr><td>SINGLE</td><td>수도는?</td><td>서울|부산|대구</td><td>서울</td><td>2</td><td>15</td></tr>
+                  <tr><td>MULTI</td><td>서버리스는?</td><td>Lambda|EC2|DynamoDB</td><td>Lambda|DynamoDB</td><td></td><td></td></tr>
+                  <tr><td>TEXT</td><td>AWS 함수 서비스?</td><td></td><td>Lambda|람다</td><td>1</td><td>10</td></tr>
+                </tbody>
+              </table>
               <p className="muted small">💡 처음이면 <b>내보내기</b>로 받은 파일을 템플릿처럼 편집해 다시 가져오면 형식이 정확해요. CSV는 <b>UTF-8</b>로 저장하세요.</p>
             </div>
 
