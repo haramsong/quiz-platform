@@ -33,6 +33,8 @@ export default function SetupPage({ code, pin, quizData, onRefresh, onStartQuiz,
   const [saving, setSaving] = useState(false);
   const [msg, setMsg] = useState('');
   const [pastResult, setPastResult] = useState(null); // modal data
+  const [printMode, setPrintMode] = useState('answer'); // 'question' | 'answer' | 'both'
+  const [printModalOpen, setPrintModalOpen] = useState(false);
   const initedRef = useRef(false);
 
   // Initialize from server data only once (avoid clobbering unsaved local edits).
@@ -154,7 +156,14 @@ export default function SetupPage({ code, pin, quizData, onRefresh, onStartQuiz,
 
   const doPrint = () => {
     if (questions.length === 0) { toast.show('인쇄할 문제가 없어요', { type: 'error' }); return; }
-    window.print();
+    setPrintModalOpen(true);
+  };
+
+  const runPrint = (mode) => {
+    setPrintMode(mode);
+    setPrintModalOpen(false);
+    // let the PrintView re-render with the chosen mode before opening the dialog
+    setTimeout(() => window.print(), 100);
   };
 
   const addQuestion = () => {
@@ -239,7 +248,7 @@ export default function SetupPage({ code, pin, quizData, onRefresh, onStartQuiz,
 
   return (
     <div className="setup">
-      <PrintView title={title} questions={questions} />
+      <PrintView title={title} questions={questions} mode={printMode} />
       <header className="setup-header">
         <h2>📝 퀴즈 세팅 — <code>{code}</code></h2>
         <div className="setup-actions">
@@ -307,6 +316,29 @@ export default function SetupPage({ code, pin, quizData, onRefresh, onStartQuiz,
           )}
         </main>
       </div>
+
+      {printModalOpen && (
+        <div className="confirm-backdrop" onClick={() => setPrintModalOpen(false)}>
+          <div className="confirm-box" onClick={(e) => e.stopPropagation()}>
+            <h3 className="confirm-title">🖨️ 인쇄 / PDF</h3>
+            <p className="confirm-msg">무엇을 인쇄할까요?</p>
+            <div className="print-mode-options">
+              <button className="btn ghost print-mode-btn" onClick={() => runPrint('question')}>
+                📝 문제만<span className="print-mode-sub">문제 페이지만</span>
+              </button>
+              <button className="btn ghost print-mode-btn" onClick={() => runPrint('answer')}>
+                ✅ 답안만<span className="print-mode-sub">정답 체크된 페이지만</span>
+              </button>
+              <button className="btn ghost print-mode-btn" onClick={() => runPrint('both')}>
+                📚 문제 + 답안<span className="print-mode-sub">문제 → 답안 (한 문제씩)</span>
+              </button>
+            </div>
+            <div className="confirm-actions">
+              <button className="btn ghost" onClick={() => setPrintModalOpen(false)}>취소</button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {pastResult && (
         <div className="confirm-backdrop" onClick={() => setPastResult(null)}>

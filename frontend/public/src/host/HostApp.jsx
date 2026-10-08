@@ -193,16 +193,6 @@ export default function HostApp({ initialCode }) {
     setBusy(false);
   };
 
-  // Return to the lobby WITHOUT deleting anything (quiz, questions, players stay).
-  // The live view just stops; a later "재시작" is what performs a reset.
-  const backToLobby = async () => {
-    clearInterval(timerRef.current);
-    setQuestion(null); setLb(null); setResult(null);
-    await refreshQuiz();      // reload title/thumbnail/questions so nothing looks "gone"
-    await refreshSession();   // refresh player count / state / hasResult
-    setPhase(Phase.LOBBY);
-  };
-
   const viewPastResult = async () => {
     try {
       const r = await api.getResult(code, pin);
@@ -262,7 +252,6 @@ export default function HostApp({ initialCode }) {
     const q = question;
     return (
       <div className="host-present">
-        <button className="btn ghost tiny corner-lobby" onClick={backToLobby}>← 로비</button>
         <div className="top-bar">
           <span className="q-num">Q {q.order} / {q.total}</span>
           <span className="time-points">
@@ -292,7 +281,6 @@ export default function HostApp({ initialCode }) {
 
   if (phase === Phase.LB && lb) return (
     <div className="host-present">
-      <button className="btn ghost tiny corner-lobby" onClick={backToLobby}>← 로비</button>
       <h2>Q{lb.order} 결과</h2>
       <AnswerReveal lb={lb} />
 
