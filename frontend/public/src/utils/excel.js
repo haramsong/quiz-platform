@@ -40,9 +40,19 @@ export function downloadXlsx(questions, filename = 'quiz-questions.xlsx') {
 }
 
 // ----- IMPORT: file -> questions[] (append; order assigned by caller) -----
+// Supports .xlsx / .xls / .csv. CSV is read as UTF-8 text so 한글이 깨지지 않음.
 export async function parseXlsx(file) {
-  const buf = await file.arrayBuffer();
-  const wb = XLSX.read(buf, { type: 'array' });
+  const isCsv = /\.csv$/i.test(file.name || '') || file.type === 'text/csv';
+  let wb;
+  if (isCsv) {
+    // read as UTF-8 text (strip BOM) → let SheetJS parse CSV (quotes/commas handled)
+    let text = await file.text();
+    if (text.charCodeAt(0) === 0xfeff) text = text.slice(1);
+    wb = XLSX.read(text, { type: 'string' });
+  } else {
+    const buf = await file.arrayBuffer();
+    wb = XLSX.read(buf, { type: 'array' });
+  }
   const ws = wb.Sheets[wb.SheetNames[0]];
   const rows = XLSX.utils.sheet_to_json(ws, { defval: '' });
   return rowsToQuestions(rows);

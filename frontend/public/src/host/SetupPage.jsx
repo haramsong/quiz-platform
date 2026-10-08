@@ -313,9 +313,9 @@ export default function SetupPage({ code, pin, quizData, onRefresh, onStartQuiz,
             <div className="panel-head">
               <h3>문제 목록</h3>
               <div className="q-list-actions">
-                <label className="btn tiny ghost" title="엑셀(.xlsx)에서 문제 가져오기 (추가)">
+                <label className="btn tiny ghost" title="엑셀(.xlsx)/CSV에서 문제 가져오기 (추가)">
                   ⬆︎ 가져오기
-                  <input type="file" accept=".xlsx,.xls" onChange={importExcel} hidden />
+                  <input type="file" accept=".xlsx,.xls,.csv" onChange={importExcel} hidden />
                 </label>
                 <button className="btn tiny ghost" onClick={exportExcel} title="현재 문제를 엑셀로 내보내기">⬇︎ 내보내기</button>
                 <button className="btn tiny primary" onClick={addQuestion}>+ 추가</button>
