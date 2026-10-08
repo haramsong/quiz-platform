@@ -236,13 +236,19 @@ async function endQuiz(code, meta) {
     ExpressionAttributeNames: { '#st': 'state' },
     ExpressionAttributeValues: { ':ended': 'ENDED' },
   });
-  const players = await queryByPk(PK(code), 'PLAYER#');
-  const ranking = drawWinners(players, meta?.prizeWinners || 1);
+  const allPlayers = await queryByPk(PK(code), 'PLAYER#');
   const prizeWinners = meta?.prizeWinners || 1;
-  const nameById = Object.fromEntries(players.map((p) => [p.playerId, p.nickname]));
 
-  // ----- fun stats from every answer (correct or wrong; elapsedMs is always stored) -----
+  // ----- fun stats + participation from every answer (elapsedMs always stored) -----
   const answers = await queryByPk(PK(code), 'ANSWER#', { ttlGuard: false });
+  const answeredIds = new Set(answers.map((a) => a.playerId));
+  // only players who actually answered at least once count as participants
+  // (filters out ghosts / joined-but-never-played)
+  const players = allPlayers.filter((p) => answeredIds.has(p.playerId));
+
+  const ranking = drawWinners(players, prizeWinners);
+  const nameById = Object.fromEntries(allPlayers.map((p) => [p.playerId, p.nickname]));
+
   // ① fastest overall participant: lowest AVERAGE response time (min 1 answer)
   // ② best reaction: single fastest answer across all questions
   const perPlayer = {}; // playerId -> { sum, n }
