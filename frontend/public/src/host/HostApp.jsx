@@ -40,12 +40,10 @@ export default function HostApp({ initialCode }) {
   const [lb, setLb] = useState(null);
   const [result, setResult] = useState(null);
 
-  const [totalSec, setTotalSec] = useState(20);
   const [frac, setFrac] = useState(1); // 1 → 0 (reverse progress)
   const deadlineRef = useRef(0);
 
   const startTimer = useCallback((sec) => {
-    setTotalSec(sec);
     setFrac(1);
     clearInterval(timerRef.current);
     deadlineRef.current = Date.now() + sec * 1000;
@@ -70,7 +68,7 @@ export default function HostApp({ initialCode }) {
     }
     if (type === 'question_pushed_host') {
       setQuestion(data); setAnswered(0); setPhase(Phase.QUESTION);
-      startTimer(data.timeoutSec || 20);
+      startTimer(data.timeoutSec || 10);
     }
     if (type === 'question_progress') setAnswered(data.answered);
     if (type === 'leaderboard_question') {

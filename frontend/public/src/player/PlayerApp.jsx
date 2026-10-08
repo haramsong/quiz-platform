@@ -50,7 +50,7 @@ export default function PlayerApp({ initialCode }) {
       setTextAns('');
       setSubmitted(false);
       setPhase(Phase.ANSWER);
-      startTimer(data.timeoutSec || 20);
+      startTimer(data.timeoutSec || 10);
     }
     if (type === 'leaderboard_question') {
       clearInterval(timerRef.current);
