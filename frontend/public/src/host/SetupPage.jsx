@@ -432,9 +432,9 @@ function QuestionEditor({ q, idx, onChange, onDelete, onImage, saving }) {
         </>
       )}
 
-      <div className="field">
-        <label>배점<input type="number" min={1} max={100} value={q.points || 1} onChange={e => onChange({ points: +e.target.value })} /></label>
-        <label>제한시간(초)<input type="number" min={5} max={300} value={q.timeoutSec ?? 10} onChange={e => onChange({ timeoutSec: +e.target.value })} /></label>
+      <div className="field inline-fields">
+        <label className="num-field"><span>배점</span><input type="number" min={1} max={100} value={q.points || 1} onChange={e => onChange({ points: +e.target.value })} /></label>
+        <label className="num-field"><span>제한시간(초)</span><input type="number" min={5} max={300} value={q.timeoutSec ?? 10} onChange={e => onChange({ timeoutSec: +e.target.value })} /></label>
       </div>
 
       <div className="field">

@@ -448,3 +448,10 @@ h1, h2, .player-q-body, .choice-line, .host-choice .text, .big-count,
 .fun-label { font-size: .85rem; color: var(--muted); }
 .fun-name { font-family: var(--font-display); font-size: 1.4rem; font-weight: 800; margin: .25rem 0; }
 .fun-sub { font-size: .85rem; color: #a78bfa; }
+
+
+/* ===== Numeric fields (points / time limit) in question editor ===== */
+.inline-fields { display: flex; gap: 1.5rem; }
+.num-field { display: flex; flex-direction: column; gap: .4rem; }
+.num-field > span { font-size: .82rem; color: var(--muted); }
+.num-field > input { width: 120px; }
