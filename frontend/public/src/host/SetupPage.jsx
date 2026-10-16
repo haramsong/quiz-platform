@@ -22,7 +22,7 @@ async function apiCall(path, code, pin, { method = 'GET', body } = {}) {
   return data;
 }
 
-export default function SetupPage({ code, pin, quizData, onRefresh, onStartQuiz, onResetGame, resetting }) {
+export default function SetupPage({ code, pin, quizData, onStartQuiz }) {
   const toast = useToast();
   const confirm = useConfirm();
   const [title, setTitle] = useState(quizData?.title || '');
@@ -50,13 +50,6 @@ export default function SetupPage({ code, pin, quizData, onRefresh, onStartQuiz,
       setQuestions(quizData.questions || []);
     }
   }, [quizData]);
-
-  const saveSettings = async () => {
-    setSaving(true); setMsg('');
-    await apiCall('/quizzes', code, pin, { method: 'POST', body: { code, title, prizeWinners, thumbnailKey } });
-    setSaving(false); setMsg('설정 저장됨');
-    setTimeout(() => setMsg(''), 2000);
-  };
 
   // Save settings (always) + only changed questions (_new or _dirty). Returns true on success.
   const saveAll = async () => {
@@ -211,25 +204,6 @@ export default function SetupPage({ code, pin, quizData, onRefresh, onStartQuiz,
     });
   };
 
-  const saveQ = async (idx) => {
-    const q = questions[idx];
-    setSaving(true); setMsg('');
-    const body = { ...q }; delete body._new; delete body.imageUrl;
-    if (q._new) {
-      await apiCall(`/quizzes/${code}/questions`, code, pin, { method: 'POST', body });
-    } else {
-      await apiCall(`/quizzes/${code}/questions/${q.order}`, code, pin, { method: 'PUT', body });
-    }
-    // mark saved in local state (do NOT refetch-replace, which can drop unsaved items)
-    setQuestions((prev) => {
-      const copy = [...prev];
-      if (copy[idx]) copy[idx] = { ...copy[idx], _new: false };
-      return copy;
-    });
-    setSaving(false); setMsg(`Q${q.order} 저장됨`);
-    setTimeout(() => setMsg(''), 2000);
-  };
-
   const deleteQ = async (idx) => {
     const q = questions[idx];
     const ok = await confirm.ask({
@@ -339,11 +313,9 @@ export default function SetupPage({ code, pin, quizData, onRefresh, onStartQuiz,
           {sel ? (
             <QuestionEditor
               q={sel}
-              idx={selIdx}
               onChange={(patch) => updateQ(selIdx, patch)}
               onDelete={() => deleteQ(selIdx)}
               onImage={(e) => handleQImage(e, selIdx)}
-              saving={saving}
             />
           ) : (
             <div className="empty-editor"><p className="muted">좌측에서 문제를 선택하거나 추가하세요.</p></div>
@@ -447,7 +419,7 @@ export default function SetupPage({ code, pin, quizData, onRefresh, onStartQuiz,
   );
 }
 
-function QuestionEditor({ q, idx, onChange, onDelete, onImage, saving }) {
+function QuestionEditor({ q, onChange, onDelete, onImage }) {
   const setType = (type) => {
     const patch = { type };
     if (type === 'TEXT') { patch.choices = null; patch.correctChoiceIds = null; }

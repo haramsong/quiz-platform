@@ -9,7 +9,7 @@ import AnswerReveal from '../AnswerReveal';
 import { useToast } from '../Toast';
 import { useConfirm } from '../Confirm';
 
-const Phase = { LOGIN: 'login', SETUP: 'setup', LOBBY: 'lobby', QUESTION: 'question', LB: 'lb', RESULT: 'result', PAST_RESULT: 'past_result' };
+const Phase = { LOGIN: 'login', SETUP: 'setup', LOBBY: 'lobby', QUESTION: 'question', LB: 'lb', RESULT: 'result' };
 
 // Per-code host PIN cache (session-scoped; cleared when the tab closes).
 const pinKey = (code) => `qp_host_pin_${code}`;
@@ -30,7 +30,6 @@ export default function HostApp({ initialCode }) {
   const [playerCount, setPcount] = useState(0);
   const [toasts, setToasts] = useState([]);
   const [sessionInfo, setSessionInfo] = useState(null); // { state, playerCount, hasResult }
-  const [pastResult, setPastResult] = useState(null);    // getResult snapshot
   const [busy, setBusy] = useState(false);
   const [aggregating, setAggregating] = useState(false); // tallying answers (settle window)
 
@@ -172,37 +171,6 @@ export default function HostApp({ initialCode }) {
 
   const doNext = () => send({ action: 'next' });
 
-  const resetGame = async () => {
-    const ok = await confirm.ask({
-      title: '게임 초기화',
-      message: '참가자·점수·지난 결과가 삭제됩니다.\n(문제는 유지)',
-      confirmText: '초기화',
-      danger: true,
-    });
-    if (!ok) return;
-    setBusy(true);
-    try {
-      await api.resetGame(code, pin);
-      setPcount(0);
-      setSessionInfo({ state: 'WAITING', playerCount: 0, hasResult: false });
-      setPastResult(null);
-      toast.show('게임을 초기화했어요', { type: 'success' });
-    } catch {
-      toast.show('초기화에 실패했어요', { type: 'error' });
-    }
-    setBusy(false);
-  };
-
-  const viewPastResult = async () => {
-    try {
-      const r = await api.getResult(code, pin);
-      setPastResult(r);
-      setPhase(Phase.PAST_RESULT);
-    } catch (ex) {
-      toast.show(ex.code === 'NO_RESULT' ? '저장된 지난 결과가 없어요' : '결과 조회 실패', { type: 'error' });
-    }
-  };
-
   // ---- RENDER ----
   if (phase === Phase.LOGIN) return (
     <div className="center">
@@ -217,7 +185,7 @@ export default function HostApp({ initialCode }) {
   );
 
   if (phase === Phase.SETUP) return (
-    <SetupPage code={code} pin={pin} quizData={quizData} onRefresh={refreshQuiz} onStartQuiz={goLobby} onResetGame={resetGame} resetting={busy} />
+    <SetupPage code={code} pin={pin} quizData={quizData} onStartQuiz={goLobby} />
   );
 
   if (phase === Phase.LOBBY) return (
@@ -232,19 +200,6 @@ export default function HostApp({ initialCode }) {
       <p className="muted">QR을 스캔하거나 링크로 입장하세요.</p>
       <button className="btn primary big" onClick={doStart} disabled={busy}>🚀 진행 시작</button>
       <JoinToastContainer toasts={toasts} />
-    </div>
-  );
-
-  if (phase === Phase.PAST_RESULT && pastResult) return (
-    <div className="host-present">
-      <h2>📊 지난 게임 결과</h2>
-      {pastResult.endedAt && (
-        <p className="muted center-text">
-          {new Date(pastResult.endedAt).toLocaleString('ko-KR')} 종료
-        </p>
-      )}
-      <FinalResult data={pastResult} />
-      <button className="btn ghost big next-btn" onClick={() => setPhase(Phase.LOBBY)}>← 로비로</button>
     </div>
   );
 

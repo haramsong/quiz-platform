@@ -1,10 +1,6 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect } from 'react';
 
 // Cute join toast: alternates left/right, slides in then floats up and fades.
-export default function JoinToast({ nickname }) {
-  return null; // stateless per-item, use JoinToastContainer
-}
-
 export function JoinToastContainer({ toasts }) {
   return (
     <div className="toast-container">

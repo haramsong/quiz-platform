@@ -2,15 +2,9 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import { api } from '../api';
 import { connect, send, disconnect, stopPing } from '../ws';
 import AnswerReveal from '../AnswerReveal';
+import { loadToken, saveToken, clearToken, isReconnectToken, playerIdFromToken } from '../utils/session';
 
 const Phase = { JOIN: 'join', WAIT: 'wait', ANSWER: 'answer', LEADERBOARD: 'lb', RESULT: 'result' };
-
-// Persist the session token per quiz code so a player can reconnect after a
-// refresh / network drop without re-entering a nickname. Keyed by code.
-const tokenKey = (code) => `qp_token_${code}`;
-const loadToken = (code) => { try { return code ? localStorage.getItem(tokenKey(code)) || '' : ''; } catch { return ''; } };
-const saveToken = (code, token) => { try { if (code && token) localStorage.setItem(tokenKey(code), token); } catch { /* no-op */ } };
-const clearToken = (code) => { try { if (code) localStorage.removeItem(tokenKey(code)); } catch { /* no-op */ } };
 
 export default function PlayerApp({ initialCode }) {
   const [phase, setPhase] = useState(Phase.JOIN);
@@ -109,7 +103,7 @@ export default function PlayerApp({ initialCode }) {
   // (refresh / network drop / mid-game rejoin) and wait for the next question.
   useEffect(() => {
     const saved = loadToken(initialCode);
-    if (saved && saved.startsWith(`${initialCode}:`)) {
+    if (isReconnectToken(saved, initialCode)) {
       setToken(saved);
       connectedOnceRef.current = false;
       reconnectingRef.current = true;
@@ -240,7 +234,7 @@ export default function PlayerApp({ initialCode }) {
   }
 
   if (phase === Phase.LEADERBOARD && lb) {
-    const myId = token ? token.slice(token.indexOf(':') + 1) : null;
+    const myId = playerIdFromToken(token);
     const mine = (lb.entries || []).find((e) => e.playerId === myId);
     return (
       <div className="page-compact">
@@ -276,7 +270,7 @@ export default function PlayerApp({ initialCode }) {
   }
 
   if (phase === Phase.RESULT && result) {
-    const myId = token ? token.slice(token.indexOf(':') + 1) : null;
+    const myId = playerIdFromToken(token);
     const me = result.ranking.find((r) => r.playerId === myId) || result.ranking.find((r) => r.nickname === nickname);
     const top5 = result.ranking.slice(0, 5);
     return (

@@ -5,21 +5,16 @@ import {
 import { broadcast, sendTo } from '../lib/broadcast.js';
 import { judge, resolveElapsedMs, leaderboardSortKey, round2 } from '../lib/scoring.js';
 import { drawWinners } from '../lib/lottery.js';
+import {
+  SETTLE_MS, shouldAccept, isAllAnswered,
+  buildDistribution, buildEntries, formatCorrectAnswer,
+} from '../lib/answerPolicy.js';
 import { s3, IMAGE_BUCKET } from '../lib/clients.js';
 import { GetObjectCommand } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 
 const CHOICE_COLORS = ['red', 'blue', 'yellow', 'green', 'purple', 'orange'];
 const CHOICE_LABELS = ['A', 'B', 'C', 'D', 'E', 'F'];
-
-// Settle window: after a question times out we flip to QUESTION_CLOSED but wait
-// briefly before aggregating, so answers tapped just before the deadline that
-// are still in flight (network latency) still land in the leaderboard. Answers
-// are accepted during this window only if the client-measured elapsed time is
-// within the timeout (prevents late/forged submissions from sneaking in).
-const SETTLE_MS = 600;
-// Hard cap on how late (by client-reported elapsed) an answer may claim to be.
-const ELAPSED_GRACE_MS = 300;
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
@@ -126,21 +121,14 @@ async function answer(code, ptr, msg) {
   const timeoutMs = (q?.timeoutSec || 10) * 1000;
   const now = Date.now();
 
-  // Accept decision (latency-tolerant):
-  // - RUNNING: always accept.
-  // - QUESTION_CLOSED within the settle window: accept only if the answer was
-  //   actually tapped before the deadline. We trust clientElapsedMs when present
-  //   (it reflects the real tap time) but require arrival within the settle
-  //   window so arbitrarily-late / forged submissions can't slip in.
-  let accept = false;
-  if (session.state === 'RUNNING') {
-    accept = true;
-  } else if (session.state === 'QUESTION_CLOSED' && session.closedAt) {
-    const withinSettle = now <= session.closedAt + SETTLE_MS;
-    const ce = msg.clientElapsedMs;
-    const inTime = typeof ce === 'number' && ce >= 0 && ce <= timeoutMs + ELAPSED_GRACE_MS;
-    accept = withinSettle && inTime;
-  }
+  // Accept decision (latency-tolerant); see lib/answerPolicy.js.
+  const accept = shouldAccept({
+    state: session.state,
+    closedAt: session.closedAt,
+    now,
+    clientElapsedMs: msg.clientElapsedMs,
+    timeoutMs,
+  });
   if (!accept) return ok();
 
   // reject duplicate answer
@@ -196,7 +184,7 @@ async function answer(code, ptr, msg) {
   // Everyone has answered → aggregate immediately (no need to wait for timeout).
   // Only fires while the question is still RUNNING; the settle path handles the
   // timeout case.
-  if (session.state === 'RUNNING' && total > 0 && answered >= total) {
+  if (isAllAnswered({ state: session.state, total, answered })) {
     await closeQuestion(code, order, { settle: false });
   }
   return ok();
@@ -233,10 +221,7 @@ async function closeQuestion(code, order, { settle = true } = {}) {
   const sorted = rows.sort((a, b) =>
     (a.GSI1SK || '').localeCompare(b.GSI1SK || '')
   );
-  const entries = sorted.map((r, i) => ({
-    rank: i + 1, playerId: r.playerId, nickname: nameById[r.playerId] || '?',
-    isCorrect: r.isCorrect, elapsedSec: round2(r.elapsedMs), score: r.scoreAwarded,
-  }));
+  const entries = buildEntries(sorted, nameById);
 
   // fastest correct answerer (highlighted on the host screen)
   const firstCorrect = sorted.find((r) => r.isCorrect);
@@ -245,36 +230,10 @@ async function closeQuestion(code, order, { settle = true } = {}) {
     : null;
 
   // choice distribution (objective questions only) — percentage per choice
-  let distribution = null;
-  if (q && (q.type === 'SINGLE' || q.type === 'MULTI')) {
-    const counts = Object.fromEntries((q.choices || []).map((c) => [c.id, 0]));
-    for (const r of rows) {
-      const picks = Array.isArray(r.submitted) ? r.submitted : (r.submitted != null ? [r.submitted] : []);
-      for (const id of picks) if (id in counts) counts[id] += 1;
-    }
-    const totalPicks = Object.values(counts).reduce((a, b) => a + b, 0) || 1;
-    distribution = (q.choices || []).map((c) => ({
-      id: c.id, text: c.text,
-      count: counts[c.id] || 0,
-      percent: Math.round(((counts[c.id] || 0) / totalPicks) * 100),
-      isCorrect: (q.correctChoiceIds || []).includes(c.id),
-    }));
-  }
+  const distribution = buildDistribution(q, rows);
 
   // human-readable correct answer for the leaderboard
-  let correctAnswer = null;
-  let acceptedAnswers = null;
-  if (q) {
-    if (q.type === 'TEXT') {
-      correctAnswer = q.correctText || '';
-      acceptedAnswers = (q.acceptedAnswers || []).filter(Boolean);
-    } else {
-      const byId = Object.fromEntries((q.choices || []).map((c) => [c.id, c.text]));
-      const orderIdx = Object.fromEntries((q.choices || []).map((c, i) => [c.id, i]));
-      const sortedIds = [...(q.correctChoiceIds || [])].sort((a, b) => (orderIdx[a] ?? 99) - (orderIdx[b] ?? 99));
-      correctAnswer = sortedIds.map((id) => byId[id] || id).join(', ');
-    }
-  }
+  const { correctAnswer, acceptedAnswers } = formatCorrectAnswer(q);
 
   await broadcast(code, {
     type: 'leaderboard_question',
