@@ -93,6 +93,12 @@ input:focus { outline: 2px solid var(--primary); }
 .kv > span:first-child { width: 90px; color: var(--muted); font-size: .82rem; }
 .kv code, code { background: #150c28; padding: .2rem .45rem; border-radius: 6px; font-size: .85rem; }
 .url { max-width: 100%; overflow-wrap: anywhere; }
+.url.link { color: #a78bfa; text-decoration: none; }
+.url.link:hover { text-decoration: underline; }
+/* list cell: stack participant/host link rows compactly */
+.links-cell .kv { margin: .2rem 0; }
+.links-cell .kv > span:first-child { width: 48px; }
+.links-cell .url { font-size: .8rem; max-width: 320px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
 table { width: 100%; border-collapse: collapse; font-size: .88rem; }
 th, td { text-align: left; padding: .55rem .5rem; border-bottom: 1px solid var(--border); vertical-align: middle; }

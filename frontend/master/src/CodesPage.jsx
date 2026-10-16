@@ -1,5 +1,6 @@
 import { useEffect, useState, useCallback } from 'react';
 import { api } from './api';
+import { buildLinks } from './links';
 import ConfirmModal from './ConfirmModal';
 
 function Copy({ text }) {
@@ -19,6 +20,22 @@ function Copy({ text }) {
     >
       {done ? '복사됨' : '복사'}
     </button>
+  );
+}
+
+// One labeled link: open-in-new-tab button + copy button. The visible URL is
+// the public-console URL derived from the master console's own location.
+function LinkRow({ label, url }) {
+  if (!url) return null;
+  return (
+    <div className="kv">
+      <span>{label}</span>
+      <a className="url link" href={url} target="_blank" rel="noopener noreferrer">{url}</a>
+      <button className="btn tiny ghost" onClick={() => window.open(url, '_blank', 'noopener')}>
+        새 탭
+      </button>
+      <Copy text={url} />
+    </div>
   );
 }
 
@@ -127,7 +144,9 @@ export default function CodesPage({ masterKey, onLogout }) {
         </form>
         <p className="muted small">만료일이 지나면 퀴즈·참여 데이터가 자동 삭제됩니다(비용 최적화).</p>
 
-        {issued && (
+        {issued && (() => {
+          const links = buildLinks(issued.code, issued);
+          return (
           <div className="issued">
             <p>
               발행 완료: <strong>{issued.code}</strong>
@@ -137,21 +156,14 @@ export default function CodesPage({ masterKey, onLogout }) {
               <code>{issued.hostPin}</code>
               <Copy text={issued.hostPin} />
             </div>
-            <div className="kv">
-              <span>참여자 링크</span>
-              <code className="url">{issued.participantUrl}</code>
-              <Copy text={issued.participantUrl} />
-            </div>
-            <div className="kv">
-              <span>호스트 링크</span>
-              <code className="url">{issued.hostUrl}</code>
-              <Copy text={issued.hostUrl} />
-            </div>
+            <LinkRow label="참여자 링크" url={links.participantUrl} />
+            <LinkRow label="호스트 링크" url={links.hostUrl} />
             <p className="muted small">
               ⚠️ Host PIN은 지금만 표시됩니다. 호스트에게 링크와 PIN을 전달하세요.
             </p>
           </div>
-        )}
+          );
+        })()}
       </section>
 
       <section className="panel">
@@ -175,7 +187,7 @@ export default function CodesPage({ masterKey, onLogout }) {
                 <th>Host PIN</th>
                 <th>만료일</th>
                 <th>상태</th>
-                <th>참여자 링크</th>
+                <th>링크</th>
                 <th>작업</th>
               </tr>
             </thead>
@@ -193,9 +205,16 @@ export default function CodesPage({ masterKey, onLogout }) {
                   </td>
                   <td className="small">{fmtDate(it.expireAt)}</td>
                   <td><span className="badge">{it.status}</span></td>
-                  <td>
-                    <span className="url small">{it.participantUrl}</span>
-                    <Copy text={it.participantUrl} />
+                  <td className="links-cell">
+                    {(() => {
+                      const links = buildLinks(it.code, it);
+                      return (
+                        <>
+                          <LinkRow label="참여" url={links.participantUrl} />
+                          <LinkRow label="호스트" url={links.hostUrl} />
+                        </>
+                      );
+                    })()}
                   </td>
                   <td className="actions">
                     <button
