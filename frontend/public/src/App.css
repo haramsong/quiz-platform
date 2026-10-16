@@ -341,10 +341,13 @@ h1, h2, .player-q-body, .choice-line, .host-choice .text, .big-count,
     font-family: var(--font-body);
   }
 
-  /* each section fills one landscape page */
+  /* each section fills one landscape A4 page.
+     Use the physical page size (297mm × 210mm) instead of 100vh —
+     100vh resolves to the portrait viewport height in Chrome's print
+     layout and makes it fall back to portrait + emit blank pages. */
   .print-page {
     box-sizing: border-box;
-    width: 100%; min-height: 100vh;
+    width: 297mm; height: 210mm;
     display: flex; flex-direction: column; justify-content: center;
     padding: 14mm 16mm;
     background: #0f172a; color: #e2e8f0;
