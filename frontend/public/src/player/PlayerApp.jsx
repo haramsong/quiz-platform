@@ -25,6 +25,7 @@ export default function PlayerApp({ initialCode }) {
   const [selected, setSelected] = useState([]);
   const [textAns, setTextAns] = useState('');
   const [submitted, setSubmitted] = useState(false);
+  const [aggregating, setAggregating] = useState(false);
   const [frac, setFrac] = useState(1);
   const [secLeft, setSecLeft] = useState(0);
   const startRef = useRef(0); // performance.now at question_pushed
@@ -80,16 +81,23 @@ export default function PlayerApp({ initialCode }) {
       setSelected([]);
       setTextAns('');
       setSubmitted(false);
+      setAggregating(false);
       setPhase(Phase.ANSWER);
       startTimer(data.timeoutSec || 10);
     }
+    if (type === 'aggregating') {
+      clearInterval(timerRef.current);
+      setAggregating(true);
+    }
     if (type === 'leaderboard_question') {
       clearInterval(timerRef.current);
+      setAggregating(false);
       setLb(data);
       setPhase(Phase.LEADERBOARD);
     }
     if (type === 'final_result') {
       clearInterval(timerRef.current);
+      setAggregating(false);
       setResult(data);
       setPhase(Phase.RESULT);
       stopPing(); // game over → stop keep-alive so the connection idles out
@@ -142,8 +150,9 @@ export default function PlayerApp({ initialCode }) {
 
   const tapSingle = (id) => {
     if (submitted) return;
-    setSelected([id]); // show selection highlight first
-    setTimeout(() => doAnswer([id]), 350); // brief delay so the user sees their pick
+    setSelected([id]);  // highlight the pick immediately
+    doAnswer([id]);     // submit at once — elapsed = the real tap time, no +350ms bias.
+                        // the "✅ 제출 완료" badge + selected highlight already show what was chosen.
   };
   const toggleMulti = (id) => {
     setSelected((s) => s.includes(id) ? s.filter((x) => x !== id) : [...s, id]);
@@ -221,7 +230,11 @@ export default function PlayerApp({ initialCode }) {
             {!submitted && <button className="btn primary" disabled={!textAns.trim()} onClick={() => doAnswer(textAns.trim())}>제출</button>}
           </div>
         )}
-        {submitted && <p className="muted center-text">결과를 기다리는 중…</p>}
+        {aggregating ? (
+          <div className="aggregating-inline"><span className="spinner small" /><span>집계 중…</span></div>
+        ) : (
+          submitted && <p className="muted center-text">결과를 기다리는 중…</p>
+        )}
       </div>
     );
   }

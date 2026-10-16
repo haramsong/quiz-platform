@@ -12,6 +12,17 @@ import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 const CHOICE_COLORS = ['red', 'blue', 'yellow', 'green', 'purple', 'orange'];
 const CHOICE_LABELS = ['A', 'B', 'C', 'D', 'E', 'F'];
 
+// Settle window: after a question times out we flip to QUESTION_CLOSED but wait
+// briefly before aggregating, so answers tapped just before the deadline that
+// are still in flight (network latency) still land in the leaderboard. Answers
+// are accepted during this window only if the client-measured elapsed time is
+// within the timeout (prevents late/forged submissions from sneaking in).
+const SETTLE_MS = 600;
+// Hard cap on how late (by client-reported elapsed) an answer may claim to be.
+const ELAPSED_GRACE_MS = 300;
+
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+
 export const handler = async (event) => {
   const connectionId = event.requestContext?.connectionId;
   let msg = {};
@@ -59,9 +70,9 @@ async function pushQuestion(code, order) {
   const now = Date.now();
   await updateItem({
     Key: { PK: PK(code), SK: SK.session() },
-    UpdateExpression: 'SET #st = :running, currentOrder = :o, questionStartedAt = :t',
+    UpdateExpression: 'SET #st = :running, currentOrder = :o, questionStartedAt = :t, answeredCount = :z',
     ExpressionAttributeNames: { '#st': 'state' },
-    ExpressionAttributeValues: { ':running': 'RUNNING', ':o': order, ':t': now },
+    ExpressionAttributeValues: { ':running': 'RUNNING', ':o': order, ':t': now, ':z': 0 },
   });
 
   const choices = (q.choices || []).map((c, i) => ({
@@ -105,24 +116,42 @@ async function next(code) {
 
 async function answer(code, ptr, msg) {
   const session = await getItem(PK(code), SK.session());
-  if (!session || session.state !== 'RUNNING') {
-    return ok();
-  }
+  if (!session) return ok();
   const order = Number(msg.order);
   if (order !== session.currentOrder) return ok();
   const playerId = ptr.playerId;
   if (!playerId) return ok();
 
+  const q = await loadQuestion(code, order);
+  const timeoutMs = (q?.timeoutSec || 10) * 1000;
+  const now = Date.now();
+
+  // Accept decision (latency-tolerant):
+  // - RUNNING: always accept.
+  // - QUESTION_CLOSED within the settle window: accept only if the answer was
+  //   actually tapped before the deadline. We trust clientElapsedMs when present
+  //   (it reflects the real tap time) but require arrival within the settle
+  //   window so arbitrarily-late / forged submissions can't slip in.
+  let accept = false;
+  if (session.state === 'RUNNING') {
+    accept = true;
+  } else if (session.state === 'QUESTION_CLOSED' && session.closedAt) {
+    const withinSettle = now <= session.closedAt + SETTLE_MS;
+    const ce = msg.clientElapsedMs;
+    const inTime = typeof ce === 'number' && ce >= 0 && ce <= timeoutMs + ELAPSED_GRACE_MS;
+    accept = withinSettle && inTime;
+  }
+  if (!accept) return ok();
+
   // reject duplicate answer
   const existing = await getItem(PK(code), SK.answer(order, playerId));
   if (existing) return ok();
 
-  const q = await loadQuestion(code, order);
   const isCorrect = judge(q, msg.submitted);
   const { elapsedMs, serverElapsedMs } = resolveElapsedMs({
     clientElapsedMs: msg.clientElapsedMs,
     questionStartedAt: session.questionStartedAt,
-    recvAt: Date.now(),
+    recvAt: now,
     timeoutSec: q?.timeoutSec || 10,
   });
   const points = isCorrect ? (q.points || 1) : 0;
@@ -146,27 +175,55 @@ async function answer(code, ptr, msg) {
   // ack to the player
   await sendTo(ptr.connectionId, { type: 'answer_ack', order, received: true });
 
-  // notify host of progress (do NOT auto-close — UI keeps the timer running to timeout)
-  const players = await queryByPk(PK(code), 'PLAYER#');
-  const answers = await queryByPk(PK(code), `ANSWER#${String(order).padStart(3, '0')}`);
+  // Progress uses O(1) counters instead of scanning all PLAYER#/ANSWER# items
+  // on every answer (which was O(N) per answer → O(N^2) per question):
+  //  - total   = session.playerCount (maintained on $connect/$disconnect)
+  //  - answered = atomic ADD on answeredCount (reset to 0 in pushQuestion).
+  // We reach here only for a newly-stored answer (duplicates returned earlier),
+  // so the increment maps 1:1 to a distinct player's first answer.
+  const total = session.playerCount || 0;
+  const upd = await updateItem({
+    Key: { PK: PK(code), SK: SK.session() },
+    UpdateExpression: 'ADD answeredCount :one',
+    ExpressionAttributeValues: { ':one': 1 },
+  }).catch(() => null);
+  const answered = upd?.answeredCount ?? 0;
+
   await broadcast(code, {
-    type: 'question_progress', order, answered: answers.length, total: players.length,
+    type: 'question_progress', order, answered, total,
   }, 'host');
+
+  // Everyone has answered → aggregate immediately (no need to wait for timeout).
+  // Only fires while the question is still RUNNING; the settle path handles the
+  // timeout case.
+  if (session.state === 'RUNNING' && total > 0 && answered >= total) {
+    await closeQuestion(code, order, { settle: false });
+  }
   return ok();
 }
 
-async function closeQuestion(code, order) {
+async function closeQuestion(code, order, { settle = true } = {}) {
   try {
     await updateItem({
       Key: { PK: PK(code), SK: SK.session() },
-      UpdateExpression: 'SET #st = :closed',
+      UpdateExpression: 'SET #st = :closed, closedAt = :now',
       ConditionExpression: '#st = :running',
       ExpressionAttributeNames: { '#st': 'state' },
-      ExpressionAttributeValues: { ':closed': 'QUESTION_CLOSED', ':running': 'RUNNING' },
+      ExpressionAttributeValues: { ':closed': 'QUESTION_CLOSED', ':running': 'RUNNING', ':now': Date.now() },
     });
   } catch {
     return ok(); // already closed (concurrent close) — skip duplicate broadcast
   }
+
+  // Tell everyone we're tallying so the UI can show a spinner instead of a
+  // frozen question. On the timeout path we then wait out the settle window so
+  // in-flight answers (tapped before the deadline) still get counted; when all
+  // players already answered there's nothing to wait for.
+  if (settle) {
+    await broadcast(code, { type: 'aggregating', order });
+    await sleep(SETTLE_MS);
+  }
+
   const q = await loadQuestion(code, order);
   const questions = await queryByPk(PK(code), 'QUESTION#');
   const rows = await queryByPk(PK(code), `ANSWER#${String(order).padStart(3, '0')}`, { ttlGuard: false });

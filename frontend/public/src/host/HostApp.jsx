@@ -32,6 +32,7 @@ export default function HostApp({ initialCode }) {
   const [sessionInfo, setSessionInfo] = useState(null); // { state, playerCount, hasResult }
   const [pastResult, setPastResult] = useState(null);    // getResult snapshot
   const [busy, setBusy] = useState(false);
+  const [aggregating, setAggregating] = useState(false); // tallying answers (settle window)
 
   const [question, setQuestion] = useState(null);
   const [answered, setAnswered] = useState(0);
@@ -67,15 +68,16 @@ export default function HostApp({ initialCode }) {
       setTimeout(() => setToasts((prev) => prev.slice(1)), 3500);
     }
     if (type === 'question_pushed_host') {
-      setQuestion(data); setAnswered(0); setPhase(Phase.QUESTION);
+      setQuestion(data); setAnswered(0); setAggregating(false); setPhase(Phase.QUESTION);
       startTimer(data.timeoutSec || 10);
     }
     if (type === 'question_progress') setAnswered(data.answered);
+    if (type === 'aggregating') { clearInterval(timerRef.current); setAggregating(true); }
     if (type === 'leaderboard_question') {
-      clearInterval(timerRef.current); setLb(data); setPhase(Phase.LB);
+      clearInterval(timerRef.current); setAggregating(false); setLb(data); setPhase(Phase.LB);
     }
     if (type === 'final_result') {
-      clearInterval(timerRef.current); setResult(data); setPhase(Phase.RESULT);
+      clearInterval(timerRef.current); setAggregating(false); setResult(data); setPhase(Phase.RESULT);
     }
   }, [startTimer]);
 
@@ -273,6 +275,12 @@ export default function HostApp({ initialCode }) {
           ))}
         </div>
         {q.qType === 'TEXT' && <div className="text-hint"><p className="muted">주관식 — 참여자 화면에서 입력</p></div>}
+        {aggregating && (
+          <div className="aggregating-overlay">
+            <div className="spinner" />
+            <p className="aggregating-text">집계 중…</p>
+          </div>
+        )}
       </div>
     );
   }
