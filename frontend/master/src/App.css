@@ -31,7 +31,7 @@ h1, .center-card h1 { font-family: var(--font-display); letter-spacing: .01em; }
 }
 .center-card form { display: grid; gap: .75rem; width: min(360px, 90vw); margin-top: 1rem; }
 
-.page { max-width: 960px; margin: 0 auto; padding: 1.5rem 1rem 4rem; }
+.page { max-width: 1200px; margin: 0 auto; padding: 1.5rem 1rem 4rem; }
 .topbar {
   display: flex; justify-content: space-between; align-items: center;
   margin-bottom: 1.25rem;
@@ -93,10 +93,10 @@ input:focus { outline: 2px solid var(--primary); }
 .kv > span:first-child { width: 90px; color: var(--muted); font-size: .82rem; }
 .kv code, code { background: #150c28; padding: .2rem .45rem; border-radius: 6px; font-size: .85rem; }
 .url { max-width: 100%; overflow-wrap: anywhere; }
-/* compact link rows: label + 이동/복사 buttons only (no URL text) */
-.links-cell { display: flex; flex-direction: column; gap: .25rem; }
-.link-row { margin: 0; gap: .4rem; }
-.link-row > span:first-child { width: 56px; }
+/* link rows: 이동/복사 buttons (label optional, used only in the issued block) */
+.links-cell { display: flex; align-items: center; gap: .4rem; white-space: nowrap; }
+.link-row { margin: 0; gap: .4rem; flex-wrap: nowrap; }
+.link-row > span:first-child { width: 72px; }
 .link-row a.btn { text-decoration: none; }
 
 table { width: 100%; border-collapse: collapse; font-size: .88rem; }

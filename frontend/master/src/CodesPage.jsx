@@ -30,7 +30,7 @@ function LinkRow({ label, url }) {
   if (!url) return null;
   return (
     <div className="kv link-row">
-      <span>{label}</span>
+      {label && <span>{label}</span>}
       <a className="btn tiny ghost" href={url} target="_blank" rel="noopener noreferrer">이동</a>
       <Copy text={url} />
     </div>
@@ -203,7 +203,7 @@ export default function CodesPage({ masterKey, onLogout }) {
                   <td className="small">{fmtDate(it.expireAt)}</td>
                   <td><span className="badge">{it.status}</span></td>
                   <td className="links-cell">
-                    <LinkRow label="호스트" url={buildLinks(it.code, it).hostUrl} />
+                    <LinkRow url={buildLinks(it.code, it).hostUrl} />
                   </td>
                   <td className="actions">
                     <button
