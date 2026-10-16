@@ -93,8 +93,10 @@ input:focus { outline: 2px solid var(--primary); }
 .kv > span:first-child { width: 90px; color: var(--muted); font-size: .82rem; }
 .kv code, code { background: #150c28; padding: .2rem .45rem; border-radius: 6px; font-size: .85rem; }
 .url { max-width: 100%; overflow-wrap: anywhere; }
-/* link rows: 이동/복사 buttons (label optional, used only in the issued block) */
-.links-cell { display: flex; align-items: center; gap: .4rem; white-space: nowrap; }
+/* link rows: 이동/복사 buttons (label optional, used only in the issued block).
+   NOTE: flex is applied to an inner wrapper, not the <td> itself — putting
+   display:flex directly on a <td> drops it out of the table column layout. */
+.links-cell > .links-wrap { display: flex; align-items: center; gap: .4rem; white-space: nowrap; }
 .link-row { margin: 0; gap: .4rem; flex-wrap: nowrap; }
 .link-row > span:first-child { width: 72px; }
 .link-row a.btn { text-decoration: none; }
@@ -103,7 +105,7 @@ table { width: 100%; border-collapse: collapse; font-size: .88rem; }
 th, td { text-align: left; padding: .55rem .5rem; border-bottom: 1px solid var(--border); vertical-align: middle; }
 th { color: var(--muted); font-weight: 600; }
 .badge { background: var(--panel2); border: 1px solid var(--border); padding: .15rem .5rem; border-radius: 999px; font-size: .75rem; }
-.actions { display: flex; gap: .4rem; }
+.actions > .actions-wrap { display: flex; gap: .4rem; }
 
 .modal-backdrop {
   position: fixed; inset: 0;

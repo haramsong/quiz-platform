@@ -203,9 +203,12 @@ export default function CodesPage({ masterKey, onLogout }) {
                   <td className="small">{fmtDate(it.expireAt)}</td>
                   <td><span className="badge">{it.status}</span></td>
                   <td className="links-cell">
-                    <LinkRow url={buildLinks(it.code, it).hostUrl} />
+                    <div className="links-wrap">
+                      <LinkRow url={buildLinks(it.code, it).hostUrl} />
+                    </div>
                   </td>
                   <td className="actions">
+                    <div className="actions-wrap">
                     <button
                       className="btn tiny warn"
                       onClick={() => setModal({ mode: 'reset', code: it.code })}
@@ -218,6 +221,7 @@ export default function CodesPage({ masterKey, onLogout }) {
                     >
                       삭제
                     </button>
+                    </div>
                   </td>
                 </tr>
               ))}
