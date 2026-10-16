@@ -39,10 +39,16 @@ jobs:
           filters: |
             backend:
               - 'backend/**'
+              - '!backend/**/*.test.js'
+              - '!backend/**/*.spec.js'
             public:
               - 'frontend/public/**'
+              - '!frontend/public/**/*.test.js'
+              - '!frontend/public/**/*.spec.js'
             master:
               - 'frontend/master/**'
+              - '!frontend/master/**/*.test.js'
+              - '!frontend/master/**/*.spec.js'
 
   # ---------------- Backend (SAM via CloudFormation service role) ----------------
   backend:
