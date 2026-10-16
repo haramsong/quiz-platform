@@ -36,6 +36,11 @@ jobs:
       - uses: dorny/paths-filter@v3
         id: filter
         with:
+          # 'every' (AND) is required for the negation (!) patterns below to work.
+          # With the default 'some' (OR), a non-test file matches '!**/*.test.js'
+          # and makes every filter true → everything deploys. 'every' means a
+          # changed file must be under the dir AND not a test/spec file.
+          predicate-quantifier: 'every'
           filters: |
             backend:
               - 'backend/**'
