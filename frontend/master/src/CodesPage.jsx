@@ -154,7 +154,6 @@ export default function CodesPage({ masterKey, onLogout }) {
               <code>{issued.hostPin}</code>
               <Copy text={issued.hostPin} />
             </div>
-            <LinkRow label="참여자 링크" url={links.participantUrl} />
             <LinkRow label="호스트 링크" url={links.hostUrl} />
             <p className="muted small">
               ⚠️ Host PIN은 지금만 표시됩니다. 호스트에게 링크와 PIN을 전달하세요.
@@ -185,7 +184,7 @@ export default function CodesPage({ masterKey, onLogout }) {
                 <th>Host PIN</th>
                 <th>만료일</th>
                 <th>상태</th>
-                <th>링크</th>
+                <th>호스트 링크</th>
                 <th>작업</th>
               </tr>
             </thead>
@@ -204,15 +203,7 @@ export default function CodesPage({ masterKey, onLogout }) {
                   <td className="small">{fmtDate(it.expireAt)}</td>
                   <td><span className="badge">{it.status}</span></td>
                   <td className="links-cell">
-                    {(() => {
-                      const links = buildLinks(it.code, it);
-                      return (
-                        <>
-                          <LinkRow label="참여" url={links.participantUrl} />
-                          <LinkRow label="호스트" url={links.hostUrl} />
-                        </>
-                      );
-                    })()}
+                    <LinkRow label="호스트" url={buildLinks(it.code, it).hostUrl} />
                   </td>
                   <td className="actions">
                     <button
