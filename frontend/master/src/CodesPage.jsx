@@ -23,17 +23,15 @@ function Copy({ text }) {
   );
 }
 
-// One labeled link: open-in-new-tab button + copy button. The visible URL is
-// the public-console URL derived from the master console's own location.
+// One labeled link: just an "이동"(open new tab) button + a copy button.
+// The URL text itself is hidden to keep table cells compact; the link lives in
+// the anchor. `url` is the public-console URL derived from the master location.
 function LinkRow({ label, url }) {
   if (!url) return null;
   return (
-    <div className="kv">
+    <div className="kv link-row">
       <span>{label}</span>
-      <a className="url link" href={url} target="_blank" rel="noopener noreferrer">{url}</a>
-      <button className="btn tiny ghost" onClick={() => window.open(url, '_blank', 'noopener')}>
-        새 탭
-      </button>
+      <a className="btn tiny ghost" href={url} target="_blank" rel="noopener noreferrer">이동</a>
       <Copy text={url} />
     </div>
   );
