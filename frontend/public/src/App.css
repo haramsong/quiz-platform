@@ -6,6 +6,9 @@
   --font-display: 'Gowun Dodum', var(--font-body);
 }
 * { box-sizing: border-box; }
+/* Prevent mobile pull-to-refresh (and vertical overscroll chaining):
+   dragging down inside the quiz UI should never trigger a page reload. */
+html, body { overscroll-behavior-y: contain; }
 body { margin: 0; font-family: var(--font-body); background: var(--bg); color: var(--text); }
 
 /* playful display font for titles, choices, timer, big numbers */

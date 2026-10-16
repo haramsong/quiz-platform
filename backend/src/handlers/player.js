@@ -15,8 +15,11 @@ export const handler = async (event) => {
     return error(404, 'CODE_NOT_FOUND', 'invalid or expired code');
   }
   const session = await getItem(PK(code), SK.session());
-  if (session && session.state && session.state !== 'WAITING') {
-    return error(409, 'ALREADY_STARTED', 'quiz already started');
+  // Allow mid-game joins: a new player may enter while the quiz is RUNNING or
+  // between questions (QUESTION_CLOSED). They simply wait for the next question.
+  // Only a finished quiz (ENDED) rejects new joins.
+  if (session && session.state === 'ENDED') {
+    return error(409, 'ALREADY_ENDED', 'quiz already ended');
   }
 
   // nickname uniqueness within session

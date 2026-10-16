@@ -26,6 +26,16 @@ export const handler = async (event) => {
   if (!codeItem || (codeItem.expireAt && codeItem.expireAt <= now)) {
     return { statusCode: 403 };
   }
+
+  // For player connections, verify the token refers to a real player. This
+  // defends against forged tokens and lets the client detect a stale/invalid
+  // reconnect token (403 → fall back to the join screen).
+  if (role === 'player') {
+    if (!playerId) return { statusCode: 403 };
+    const playerItem = await getItem(PK(code), SK.player(playerId));
+    if (!playerItem) return { statusCode: 403 };
+  }
+
   const expireAt = (codeItem.expireAt || now + 7 * 24 * 3600);
 
   await putItem({

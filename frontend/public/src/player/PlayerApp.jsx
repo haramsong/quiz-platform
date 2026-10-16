@@ -5,6 +5,13 @@ import AnswerReveal from '../AnswerReveal';
 
 const Phase = { JOIN: 'join', WAIT: 'wait', ANSWER: 'answer', LEADERBOARD: 'lb', RESULT: 'result' };
 
+// Persist the session token per quiz code so a player can reconnect after a
+// refresh / network drop without re-entering a nickname. Keyed by code.
+const tokenKey = (code) => `qp_token_${code}`;
+const loadToken = (code) => { try { return code ? localStorage.getItem(tokenKey(code)) || '' : ''; } catch { return ''; } };
+const saveToken = (code, token) => { try { if (code && token) localStorage.setItem(tokenKey(code), token); } catch { /* no-op */ } };
+const clearToken = (code) => { try { if (code) localStorage.removeItem(tokenKey(code)); } catch { /* no-op */ } };
+
 export default function PlayerApp({ initialCode }) {
   const [phase, setPhase] = useState(Phase.JOIN);
   const [code, setCode] = useState(initialCode || '');
@@ -42,7 +49,31 @@ export default function PlayerApp({ initialCode }) {
     }, 100);
   }, []);
 
+  // reconnect bookkeeping: distinguish a rejected token (close before any open)
+  // from a normal transient drop (ws.js auto-reconnects on its own).
+  const connectedOnceRef = useRef(false);
+  const reconnectingRef = useRef(false);
+
   const handleWs = useCallback((type, data) => {
+    if (type === '_open') {
+      connectedOnceRef.current = true;
+      reconnectingRef.current = false;
+      return;
+    }
+    if (type === '_close') {
+      // Close before we ever opened during a token-based reconnect means the
+      // server rejected the token ($connect 403: player no longer exists /
+      // forged / expired). Stop retrying and fall back to the join screen.
+      if (!connectedOnceRef.current && reconnectingRef.current) {
+        reconnectingRef.current = false;
+        disconnect(); // stops keep-alive + auto-reconnect loop
+        clearToken(code);
+        setToken(null);
+        setPhase(Phase.JOIN);
+        setErr('세션이 만료되었어요. 다시 입장해주세요.');
+      }
+      return;
+    }
     if (type === 'question_pushed_player') {
       startRef.current = performance.now();
       setQuestion(data);
@@ -62,8 +93,24 @@ export default function PlayerApp({ initialCode }) {
       setResult(data);
       setPhase(Phase.RESULT);
       stopPing(); // game over → stop keep-alive so the connection idles out
+      clearToken(code); // finished quiz: don't auto-reconnect on a later visit
     }
-  }, [startTimer]);
+  }, [startTimer, code]);
+
+  // On mount: if we have a stored token for this code, reconnect automatically
+  // (refresh / network drop / mid-game rejoin) and wait for the next question.
+  useEffect(() => {
+    const saved = loadToken(initialCode);
+    if (saved && saved.startsWith(`${initialCode}:`)) {
+      setToken(saved);
+      connectedOnceRef.current = false;
+      reconnectingRef.current = true;
+      connect({ token: saved }, handleWs);
+      setPhase(Phase.WAIT);
+    }
+    // run once on mount
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   useEffect(() => () => { clearInterval(timerRef.current); disconnect(); }, []);
 
@@ -72,8 +119,12 @@ export default function PlayerApp({ initialCode }) {
     if (!code.trim() || !nickname.trim()) return;
     setLoading(true); setErr('');
     try {
-      const r = await api.join(code.trim().toUpperCase(), nickname.trim());
+      const normCode = code.trim().toUpperCase();
+      const r = await api.join(normCode, nickname.trim());
       setToken(r.sessionToken);
+      saveToken(normCode, r.sessionToken); // persist for reconnect
+      connectedOnceRef.current = false;
+      reconnectingRef.current = false; // fresh join: close shouldn't trigger token-expiry fallback
       connect({ token: r.sessionToken }, handleWs);
       setPhase(Phase.WAIT);
     } catch (ex) {
