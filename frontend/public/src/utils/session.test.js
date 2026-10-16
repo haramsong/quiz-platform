@@ -1,6 +1,7 @@
 import { describe, test, expect } from 'vitest';
 import {
   tokenKey, loadToken, saveToken, clearToken, isReconnectToken, playerIdFromToken,
+  nickKey, loadNick, saveNick, clearNick,
 } from './session.js';
 
 // Minimal in-memory store matching the localStorage getItem/setItem/removeItem API.
@@ -67,6 +68,36 @@ describe('isReconnectToken', () => {
     expect(isReconnectToken('', 'ABCD')).toBe(false);
     expect(isReconnectToken('ABCD:p1', '')).toBe(false);
     expect(isReconnectToken(null, 'ABCD')).toBe(false);
+  });
+});
+
+describe('nickname helpers', () => {
+  test('nickKey: namespaced per code', () => {
+    expect(nickKey('ABCD')).toBe('qp_nick_ABCD');
+  });
+  test('save then load restores nickname', () => {
+    const s = fakeStore();
+    saveNick('ABCD', '핫람', s);
+    expect(loadNick('ABCD', s)).toBe('핫람');
+  });
+  test('clear removes nickname', () => {
+    const s = fakeStore({ 'qp_nick_ABCD': '핫람' });
+    clearNick('ABCD', s);
+    expect(loadNick('ABCD', s)).toBe('');
+  });
+  test('load missing → empty string', () => {
+    expect(loadNick('NOPE', fakeStore())).toBe('');
+  });
+  test('save ignores empty code/nickname', () => {
+    const s = fakeStore();
+    saveNick('', 'x', s);
+    saveNick('ABCD', '', s);
+    expect(s._dump()).toEqual({});
+  });
+  test('no-op when store null', () => {
+    expect(loadNick('ABCD', null)).toBe('');
+    expect(() => saveNick('ABCD', 'x', null)).not.toThrow();
+    expect(() => clearNick('ABCD', null)).not.toThrow();
   });
 });
 

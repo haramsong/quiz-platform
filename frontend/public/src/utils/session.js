@@ -20,6 +20,22 @@ export function clearToken(code, store = safeStore()) {
   try { if (code && store) store.removeItem(tokenKey(code)); } catch { /* no-op */ }
 }
 
+// Nickname is persisted alongside the token so a reconnect can restore the
+// player's display name (the reconnect path doesn't re-run join).
+export const nickKey = (code) => `qp_nick_${code}`;
+
+export function loadNick(code, store = safeStore()) {
+  try { return code && store ? store.getItem(nickKey(code)) || '' : ''; } catch { return ''; }
+}
+
+export function saveNick(code, nickname, store = safeStore()) {
+  try { if (code && nickname && store) store.setItem(nickKey(code), nickname); } catch { /* no-op */ }
+}
+
+export function clearNick(code, store = safeStore()) {
+  try { if (code && store) store.removeItem(nickKey(code)); } catch { /* no-op */ }
+}
+
 // A stored token is a valid reconnect candidate only if it belongs to this
 // quiz code (format: `${code}:${playerId}`). Guards against stale/foreign tokens.
 export function isReconnectToken(saved, code) {

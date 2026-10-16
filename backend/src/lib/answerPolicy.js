@@ -32,6 +32,19 @@ export function isAllAnswered({ state, total, answered }) {
   return state === 'RUNNING' && total > 0 && answered >= total;
 }
 
+// Count distinct players currently connected, from the session's connection
+// items. Uses role === 'player' and dedupes by playerId so a reconnecting
+// player (old + new socket momentarily both present) is counted once. This is
+// more robust than a running playerCount counter against connect/disconnect
+// races on refresh.
+export function countConnectedPlayers(connections) {
+  const ids = new Set();
+  for (const c of connections || []) {
+    if (c && c.role === 'player' && c.playerId) ids.add(c.playerId);
+  }
+  return ids.size;
+}
+
 // Choice distribution (SINGLE/MULTI only) from stored answer rows.
 // Returns null for TEXT / missing question.
 export function buildDistribution(question, rows) {

@@ -1,12 +1,12 @@
 // $default WebSocket router: start / next / answer / ping.
 import {
-  PK, SK, getItem, putItem, updateItem, queryByPk,
+  PK, SK, getItem, putItem, updateItem, queryByPk, queryGsi1,
 } from '../lib/ddb.js';
-import { broadcast, sendTo } from '../lib/broadcast.js';
+import { broadcast, sendTo, CONN_INDEX } from '../lib/broadcast.js';
 import { judge, resolveElapsedMs, leaderboardSortKey, round2 } from '../lib/scoring.js';
 import { drawWinners } from '../lib/lottery.js';
 import {
-  SETTLE_MS, shouldAccept, isAllAnswered,
+  SETTLE_MS, shouldAccept, isAllAnswered, countConnectedPlayers,
   buildDistribution, buildEntries, formatCorrectAnswer,
 } from '../lib/answerPolicy.js';
 import { s3, IMAGE_BUCKET } from '../lib/clients.js';
@@ -163,13 +163,15 @@ async function answer(code, ptr, msg) {
   // ack to the player
   await sendTo(ptr.connectionId, { type: 'answer_ack', order, received: true });
 
-  // Progress uses O(1) counters instead of scanning all PLAYER#/ANSWER# items
-  // on every answer (which was O(N) per answer → O(N^2) per question):
-  //  - total   = session.playerCount (maintained on $connect/$disconnect)
+  // Progress/all-answered use:
+  //  - total   = distinct players currently connected (role=player conns,
+  //              deduped by playerId). Robust against connect/disconnect races
+  //              on refresh, unlike a running playerCount counter.
   //  - answered = atomic ADD on answeredCount (reset to 0 in pushQuestion).
   // We reach here only for a newly-stored answer (duplicates returned earlier),
   // so the increment maps 1:1 to a distinct player's first answer.
-  const total = session.playerCount || 0;
+  const conns = await queryGsi1(CONN_INDEX(code));
+  const total = countConnectedPlayers(conns);
   const upd = await updateItem({
     Key: { PK: PK(code), SK: SK.session() },
     UpdateExpression: 'ADD answeredCount :one',

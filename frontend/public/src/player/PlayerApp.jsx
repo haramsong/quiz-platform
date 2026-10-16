@@ -2,7 +2,7 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import { api } from '../api';
 import { connect, send, disconnect, stopPing } from '../ws';
 import AnswerReveal from '../AnswerReveal';
-import { loadToken, saveToken, clearToken, isReconnectToken, playerIdFromToken } from '../utils/session';
+import { loadToken, saveToken, clearToken, isReconnectToken, playerIdFromToken, loadNick, saveNick, clearNick } from '../utils/session';
 
 const Phase = { JOIN: 'join', WAIT: 'wait', ANSWER: 'answer', LEADERBOARD: 'lb', RESULT: 'result' };
 
@@ -63,6 +63,7 @@ export default function PlayerApp({ initialCode }) {
         reconnectingRef.current = false;
         disconnect(); // stops keep-alive + auto-reconnect loop
         clearToken(code);
+        clearNick(code);
         setToken(null);
         setPhase(Phase.JOIN);
         setErr('세션이 만료되었어요. 다시 입장해주세요.');
@@ -96,6 +97,7 @@ export default function PlayerApp({ initialCode }) {
       setPhase(Phase.RESULT);
       stopPing(); // game over → stop keep-alive so the connection idles out
       clearToken(code); // finished quiz: don't auto-reconnect on a later visit
+      clearNick(code);
     }
   }, [startTimer, code]);
 
@@ -105,6 +107,8 @@ export default function PlayerApp({ initialCode }) {
     const saved = loadToken(initialCode);
     if (isReconnectToken(saved, initialCode)) {
       setToken(saved);
+      const savedNick = loadNick(initialCode);
+      if (savedNick) setNick(savedNick); // restore display name on reconnect
       connectedOnceRef.current = false;
       reconnectingRef.current = true;
       connect({ token: saved }, handleWs);
@@ -125,6 +129,7 @@ export default function PlayerApp({ initialCode }) {
       const r = await api.join(normCode, nickname.trim());
       setToken(r.sessionToken);
       saveToken(normCode, r.sessionToken); // persist for reconnect
+      saveNick(normCode, nickname.trim()); // persist display name for reconnect
       connectedOnceRef.current = false;
       reconnectingRef.current = false; // fresh join: close shouldn't trigger token-expiry fallback
       connect({ token: r.sessionToken }, handleWs);

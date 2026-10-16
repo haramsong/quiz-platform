@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
   SETTLE_MS, ELAPSED_GRACE_MS,
-  shouldAccept, isAllAnswered,
+  shouldAccept, isAllAnswered, countConnectedPlayers,
   buildDistribution, buildEntries, formatCorrectAnswer,
 } from './answerPolicy.js';
 
@@ -71,6 +71,27 @@ test('isAllAnswered: fires only when RUNNING and answered>=total>0', () => {
   assert.equal(isAllAnswered({ state: 'RUNNING', total: 3, answered: 2 }), false);
   assert.equal(isAllAnswered({ state: 'RUNNING', total: 0, answered: 0 }), false);
   assert.equal(isAllAnswered({ state: 'QUESTION_CLOSED', total: 3, answered: 3 }), false);
+});
+
+test('countConnectedPlayers: distinct player ids among player-role conns', () => {
+  const conns = [
+    { role: 'host', playerId: null },
+    { role: 'player', playerId: 'p1' },
+    { role: 'player', playerId: 'p2' },
+    { role: 'player', playerId: 'p1' }, // reconnect: old+new socket, same player → counted once
+    { role: 'player', playerId: null }, // malformed → ignored
+  ];
+  assert.equal(countConnectedPlayers(conns), 2);
+});
+
+test('countConnectedPlayers: empty / nullish', () => {
+  assert.equal(countConnectedPlayers([]), 0);
+  assert.equal(countConnectedPlayers(null), 0);
+  assert.equal(countConnectedPlayers(undefined), 0);
+});
+
+test('countConnectedPlayers: hosts never counted', () => {
+  assert.equal(countConnectedPlayers([{ role: 'host', playerId: 'h1' }]), 0);
 });
 
 const SINGLE_Q = {
